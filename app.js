@@ -829,7 +829,11 @@ async function handleSubmitBatchToSupabase() {
   DOM.btnSubmit.disabled = true;
   DOM.btnSubmitText.textContent = 'MEMPROSES SUBMIT...';
 
+  // Generate a single unique Batch/Header Unit ID for this submit action
+  const batchUnitId = 'UNIT-' + Date.now() + '-' + Math.floor(1000 + Math.random() * 9000);
+
   const batchPayloads = state.draftList.map(item => ({
+    unit_id: batchUnitId,
     teknisi_nik: state.profile.nik || 'TEK-0000',
     nama_teknisi: state.profile.nama || 'Teknisi Anonim',
     no_gudang: item.no_gudang,
@@ -845,12 +849,26 @@ async function handleSubmitBatchToSupabase() {
     let insertedIds = [];
 
     if (state.supabaseClient) {
-      const { data, error } = await state.supabaseClient
+      let { data, error } = await state.supabaseClient
         .from(SUPABASE_CONFIG.table)
         .insert(batchPayloads)
         .select('id, status');
 
-      if (error) throw error;
+      // Fallback if unit_id column does not exist in Supabase schema yet
+      if (error && error.message && error.message.includes('unit_id')) {
+        console.warn('unit_id column missing in Supabase, retrying without unit_id field...');
+        const fallbackPayloads = batchPayloads.map(({ unit_id, ...rest }) => rest);
+        const resFallback = await state.supabaseClient
+          .from(SUPABASE_CONFIG.table)
+          .insert(fallbackPayloads)
+          .select('id, status');
+        if (resFallback.error) throw resFallback.error;
+        data = resFallback.data;
+        error = null;
+      } else if (error) {
+        throw error;
+      }
+
       isSupabaseSuccess = true;
       if (data) insertedIds = data.map(d => d.id);
     }
