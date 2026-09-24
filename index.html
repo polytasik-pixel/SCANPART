@@ -116,12 +116,6 @@
               <div id="reader"></div>
             </div>
 
-            <!-- Quick Test Simulasi Scan Button -->
-            <div class="simulasi-wrapper">
-              <button id="btn-simulasi-scan" class="btn btn-ghost btn-xs">
-                <i data-lucide="zap"></i> Simulasi Scan Barcode Acak
-              </button>
-            </div>
           </div>
 
           <!-- Draft Review List Card (Daftar Part Ter-Scan) -->
@@ -156,8 +150,8 @@
             </div>
 
             <!-- Submit All Button (Triggers Popup Confirmation) -->
-            <button id="btn-submit" class="btn btn-primary btn-block btn-md" disabled>
-              <i data-lucide="send"></i>
+            <button id="btn-submit" class="btn btn-primary btn-block btn-sm" disabled>
+              <i data-lucide="send" style="width:14px; height:14px;"></i>
               <span id="btn-submit-text">SUBMIT (0 ITEM)</span>
             </button>
           </div>
@@ -275,6 +269,28 @@
 
         </section>
 
+        <!-- TAB 4: KELOLA USER (KHUSUS ADMIN) -->
+        <section id="tab-users" class="tab-content">
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">
+                <i data-lucide="users"></i> Kelola User / Teknisi
+                <span class="badge-count" id="admin-user-count">0 User</span>
+              </div>
+              <button id="btn-open-add-user" class="btn btn-primary btn-xs">
+                <i data-lucide="user-plus"></i> Tambah User
+              </button>
+            </div>
+            
+            <div id="admin-users-list" class="user-list-container">
+              <div class="empty-state-sm">
+                <i data-lucide="loader-2" class="spin-lg"></i>
+                <p>Memuat daftar user dari Supabase...</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
       </main>
 
       <!-- Bottom Navigation Bar -->
@@ -290,6 +306,10 @@
         <button class="nav-item" data-target="tab-profile">
           <i data-lucide="user-cog"></i>
           <span>Profil</span>
+        </button>
+        <button class="nav-item admin-only hidden" id="nav-item-users" data-target="tab-users">
+          <i data-lucide="users"></i>
+          <span>User</span>
         </button>
       </nav>
 
@@ -337,6 +357,66 @@
           <div class="queue-subtext" id="modal-queue-subtext">
             <span>Status: <strong id="queue-status-text">MENGANTRI / DIPROSES...</strong></span>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==========================================
+         MODAL USER FORM (TAMBAH / EDIT USER ADMIN)
+         ========================================== -->
+    <div id="modal-user-form" class="modal-overlay">
+      <div class="modal-card">
+        <div class="modal-header">
+          <div class="modal-title" id="modal-user-form-title">
+            <i data-lucide="user-plus"></i> Tambah User Baru
+          </div>
+        </div>
+        <div class="modal-body">
+          <form id="form-admin-user" onsubmit="return false;">
+            <input type="hidden" id="user-form-id" value="" />
+            
+            <div class="form-group">
+              <label for="user-form-nik">NIK Teknisi (Username)</label>
+              <div class="input-icon-wrapper">
+                <i data-lucide="id-card" class="input-icon"></i>
+                <input type="text" id="user-form-nik" placeholder="Contoh: TEK-1092 / 46" required />
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="user-form-nama">Nama Lengkap Teknisi</label>
+              <div class="input-icon-wrapper">
+                <i data-lucide="user" class="input-icon"></i>
+                <input type="text" id="user-form-nama" placeholder="Contoh: Budi Santoso" required />
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="user-form-psw">Password Akses Web Target</label>
+              <div class="input-icon-wrapper">
+                <input type="text" id="user-form-psw" placeholder="Password akun..." required style="padding-left:12px;" />
+              </div>
+            </div>
+
+            <div class="switch-card">
+              <div class="switch-info">
+                <div class="switch-label">
+                  <i data-lucide="shield-check"></i> STATUS PASSWORD (PSW)
+                </div>
+                <div class="switch-subtext">Tempel password saat konfirmasi transfer</div>
+              </div>
+              <label class="toggle-switch">
+                <input type="checkbox" id="user-form-psw-toggle" checked />
+                <span class="slider"></span>
+              </label>
+            </div>
+          </form>
+        </div>
+        <div class="modal-footer">
+          <button type="button" id="btn-cancel-user-form" class="btn btn-ghost btn-sm">Batal</button>
+          <button type="button" id="btn-save-user-form" class="btn btn-primary btn-sm">
+            <i data-lucide="save"></i> <span id="user-form-submit-text">Simpan User</span>
+          </button>
         </div>
       </div>
     </div>

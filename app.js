@@ -17,8 +17,9 @@ const STORAGE_KEYS = {
 
 let state = {
   isLoggedIn: false,
+  isAdmin: false,
   theme: 'dark', // 'dark' | 'light'
-  modalAction: null, // 'submit' | 'logout'
+  modalAction: null, // 'submit' | 'logout' | 'clearHistory' | 'deleteUser'
   profile: {
     id: '',
     nama: '',
@@ -28,10 +29,14 @@ let state = {
   },
   draftList: [],
   history: [],
+  adminUsers: [],
+  pendingDeleteUserId: null,
+  pendingDeleteUserNik: null,
   html5Qrcode: null,
   isScanning: false,
   supabaseClient: null,
-  realtimeChannel: null
+  realtimeChannel: null,
+  adminUsersChannel: null
 };
 
 // ==========================================
@@ -56,6 +61,7 @@ const DOM = {
   // App Navigation & Tabs
   navItems: document.querySelectorAll('.nav-item'),
   tabContents: document.querySelectorAll('.tab-content'),
+  navItemUsers: document.getElementById('nav-item-users'),
   
   // App Header
   headerNama: document.getElementById('header-nama'),
@@ -114,6 +120,22 @@ const DOM = {
   // History
   historyList: document.getElementById('history-list'),
   btnClearHistory: document.getElementById('btn-clear-history'),
+
+  // Admin User Management
+  adminUserCount: document.getElementById('admin-user-count'),
+  btnOpenAddUser: document.getElementById('btn-open-add-user'),
+  adminUsersList: document.getElementById('admin-users-list'),
+  modalUserForm: document.getElementById('modal-user-form'),
+  modalUserFormTitle: document.getElementById('modal-user-form-title'),
+  userFormId: document.getElementById('user-form-id'),
+  userFormNik: document.getElementById('user-form-nik'),
+  userFormNama: document.getElementById('user-form-nama'),
+  userFormPsw: document.getElementById('user-form-psw'),
+  userFormPswToggle: document.getElementById('user-form-psw-toggle'),
+  btnCloseUserModal: document.getElementById('btn-close-user-modal'),
+  btnCancelUserForm: document.getElementById('btn-cancel-user-form'),
+  btnSaveUserForm: document.getElementById('btn-save-user-form'),
+  userFormSubmitText: document.getElementById('user-form-submit-text'),
   
   // Toast
   toastContainer: document.getElementById('toast-container')
@@ -195,7 +217,19 @@ function checkLoginSession() {
       const parsed = JSON.parse(session);
       if (parsed.isLoggedIn && parsed.nik) {
         state.isLoggedIn = true;
-        syncProfileFromSupabase(parsed.nik);
+        state.isAdmin = (parsed.nik.toUpperCase() === 'ADMIN' || !!parsed.isAdmin);
+        if (state.isAdmin) {
+          state.profile = {
+            id: 'admin-id',
+            nik: 'ADMIN',
+            nama: 'Administrator',
+            psw: '000',
+            usePsw: true
+          };
+          updateUIFromState();
+        } else {
+          syncProfileFromSupabase(parsed.nik);
+        }
         showAppScreen();
         return;
       }
@@ -207,10 +241,12 @@ function checkLoginSession() {
 
 function showLoginScreen() {
   state.isLoggedIn = false;
+  state.isAdmin = false;
   DOM.screenLogin.classList.add('active');
   DOM.screenApp.classList.remove('active');
   stopScanner();
   unsubscribeRealtime();
+  unsubscribeAdminUsersRealtime();
   if (state.globalQueuePollTimer) {
     clearInterval(state.globalQueuePollTimer);
     state.globalQueuePollTimer = null;
@@ -308,6 +344,16 @@ function updateUIFromState() {
   DOM.profilePsw.value = state.profile.psw || '';
   DOM.profilePswToggle.checked = !!state.profile.usePsw;
 
+  // Toggle Admin Nav Item & Fetch Admin Users
+  if (DOM.navItemUsers) {
+    DOM.navItemUsers.classList.toggle('hidden', !state.isAdmin);
+  }
+
+  if (state.isAdmin) {
+    fetchAdminUsersList();
+    subscribeAdminUsersRealtime();
+  }
+
   // Render Draft & History Lists
   renderDraftList();
   renderHistory();
@@ -344,7 +390,7 @@ function setupEventListeners() {
 
   // Camera Scanner Buttons
   DOM.btnToggleCamera.addEventListener('click', toggleScanner);
-  DOM.btnSimulasiScan.addEventListener('click', simulateScan);
+  if (DOM.btnSimulasiScan) DOM.btnSimulasiScan.addEventListener('click', simulateScan);
 
   // Manual Add Line
   DOM.btnAddManual.addEventListener('click', handleAddManualItem);
@@ -375,6 +421,12 @@ function setupEventListeners() {
 
   // Clear History
   DOM.btnClearHistory.addEventListener('click', openClearHistoryConfirmModal);
+
+  // Admin User Management Listeners
+  if (DOM.btnOpenAddUser) DOM.btnOpenAddUser.addEventListener('click', openAddUserModal);
+  if (DOM.btnCloseUserModal) DOM.btnCloseUserModal.addEventListener('click', closeUserModal);
+  if (DOM.btnCancelUserForm) DOM.btnCancelUserForm.addEventListener('click', closeUserModal);
+  if (DOM.btnSaveUserForm) DOM.btnSaveUserForm.addEventListener('click', handleSaveUserForm);
 }
 
 // ==========================================
@@ -429,6 +481,8 @@ async function handleConfirmModalOk() {
     performLogout();
   } else if (currentAction === 'clearHistory') {
     performClearHistory();
+  } else if (currentAction === 'deleteUser') {
+    await performDeleteUser();
   }
 }
 
@@ -571,8 +625,18 @@ async function handleLogin() {
 
   try {
     let authenticatedUser = null;
+    const isAdmin = (username.toUpperCase() === 'ADMIN' && password === '000');
 
-    if (state.supabaseClient) {
+    if (isAdmin) {
+      authenticatedUser = {
+        id: 'admin-id',
+        nik: 'ADMIN',
+        nama: 'Administrator',
+        password: '000',
+        use_password: true,
+        isAdmin: true
+      };
+    } else if (state.supabaseClient) {
       const { data, error } = await state.supabaseClient
         .from('users_teknisi')
         .select('*')
@@ -609,6 +673,7 @@ async function handleLogin() {
       localStorage.removeItem(STORAGE_KEYS.SAVED_LOGIN);
     }
 
+    state.isAdmin = !!authenticatedUser.isAdmin || (authenticatedUser.nik.toUpperCase() === 'ADMIN');
     state.profile.id = authenticatedUser.id || '';
     state.profile.nik = authenticatedUser.nik;
     state.profile.nama = authenticatedUser.nama;
@@ -620,6 +685,7 @@ async function handleLogin() {
     localStorage.setItem(STORAGE_KEYS.SESSION, JSON.stringify({
       isLoggedIn: true,
       nik: authenticatedUser.nik,
+      isAdmin: state.isAdmin,
       loginAt: new Date().toISOString()
     }));
 
@@ -758,7 +824,15 @@ function startScanner() {
     state.html5Qrcode = new Html5Qrcode("reader");
   }
 
-  const config = { fps: 10, qrbox: { width: 180, height: 110 } };
+  const config = { 
+    fps: 15, 
+    qrbox: (viewfinderWidth, viewfinderHeight) => {
+      const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
+      const width = Math.floor(minEdge * 0.75);
+      const height = Math.floor(minEdge * 0.5);
+      return { width: Math.max(160, width), height: Math.max(100, height) };
+    } 
+  };
 
   state.html5Qrcode.start(
     { facingMode: "environment" },
@@ -1044,4 +1118,250 @@ function showToast(message, type = 'info') {
     toast.style.transition = 'all 0.2s ease';
     setTimeout(() => toast.remove(), 200);
   }, 3000);
+}
+
+// ==========================================
+// ADMIN USER MANAGEMENT FUNCTIONS (NIK=ADMIN, PSW=000)
+// ==========================================
+async function fetchAdminUsersList() {
+  if (!state.supabaseClient || !state.isAdmin) return;
+
+  try {
+    const { data, error } = await state.supabaseClient
+      .from('users_teknisi')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+
+    state.adminUsers = data || [];
+    renderAdminUsersList(state.adminUsers);
+  } catch (err) {
+    console.error('Error fetch admin users:', err);
+    if (DOM.adminUsersList) {
+      DOM.adminUsersList.innerHTML = `
+        <div class="empty-state-sm text-danger">
+          <i data-lucide="alert-circle"></i>
+          <p>Gagal memuat data user: ${escapeHtml(err.message)}</p>
+        </div>`;
+      lucide.createIcons();
+    }
+  }
+}
+
+function subscribeAdminUsersRealtime() {
+  if (!state.supabaseClient || !state.isAdmin || state.adminUsersChannel) return;
+
+  state.adminUsersChannel = state.supabaseClient
+    .channel('public:users_teknisi_admin')
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'users_teknisi' },
+      (payload) => {
+        console.log('Realtime Admin User Table Change:', payload);
+        fetchAdminUsersList();
+      }
+    )
+    .subscribe();
+}
+
+function unsubscribeAdminUsersRealtime() {
+  if (state.adminUsersChannel && state.supabaseClient) {
+    state.supabaseClient.removeChannel(state.adminUsersChannel);
+    state.adminUsersChannel = null;
+  }
+}
+
+function renderAdminUsersList(users) {
+  if (!DOM.adminUsersList) return;
+
+  if (DOM.adminUserCount) {
+    DOM.adminUserCount.textContent = `${users.length} User`;
+  }
+
+  if (users.length === 0) {
+    DOM.adminUsersList.innerHTML = `
+      <div class="empty-state-sm">
+        <i data-lucide="users"></i>
+        <p>Belum ada data user teknisi di Supabase.</p>
+      </div>`;
+    lucide.createIcons();
+    return;
+  }
+
+  DOM.adminUsersList.innerHTML = users.map(user => {
+    const isPswOn = user.use_password ?? true;
+    const pswBadgeClass = isPswOn ? 'on' : 'off';
+    const pswBadgeText = isPswOn ? 'PSW: ON' : 'PSW: OFF';
+
+    return `
+      <div class="user-item-card">
+        <div class="user-item-info">
+          <div class="user-avatar-sm">
+            <i data-lucide="user"></i>
+          </div>
+          <div class="user-text-details">
+            <div class="user-text-nama">
+              ${escapeHtml(user.nama)}
+              <span class="badge-psw-status ${pswBadgeClass}">${pswBadgeText}</span>
+            </div>
+            <div class="user-text-meta">
+              <span><b>NIK:</b> ${escapeHtml(user.nik)}</span>
+              <span>• <b>Pass:</b> ${escapeHtml(user.password || '-')}</span>
+            </div>
+          </div>
+        </div>
+        <div class="user-item-actions">
+          <button type="button" class="btn-icon" onclick="openEditUserModal('${user.id}')" title="Edit User">
+            <i data-lucide="edit-3"></i>
+          </button>
+          <button type="button" class="btn-icon text-danger" onclick="confirmDeleteUser('${user.id}', '${escapeHtml(user.nik)}')" title="Hapus User">
+            <i data-lucide="trash-2"></i>
+          </button>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  lucide.createIcons();
+}
+
+function openAddUserModal() {
+  if (!DOM.modalUserForm) return;
+  DOM.modalUserFormTitle.innerHTML = `<i data-lucide="user-plus"></i> Tambah User Baru`;
+  DOM.userFormSubmitText.textContent = 'Simpan User';
+  DOM.userFormId.value = '';
+  DOM.userFormNik.value = '';
+  DOM.userFormNama.value = '';
+  DOM.userFormPsw.value = '';
+  DOM.userFormPswToggle.checked = true;
+  DOM.modalUserForm.classList.add('active');
+  DOM.userFormNik.focus();
+  lucide.createIcons();
+}
+
+window.openEditUserModal = function(userId) {
+  const targetUser = state.adminUsers.find(u => String(u.id) === String(userId));
+  if (!targetUser || !DOM.modalUserForm) return;
+
+  DOM.modalUserFormTitle.innerHTML = `<i data-lucide="edit-3"></i> Edit User (${escapeHtml(targetUser.nik)})`;
+  DOM.userFormSubmitText.textContent = 'Perbarui User';
+  DOM.userFormId.value = targetUser.id;
+  DOM.userFormNik.value = targetUser.nik || '';
+  DOM.userFormNama.value = targetUser.nama || '';
+  DOM.userFormPsw.value = targetUser.password || '';
+  DOM.userFormPswToggle.checked = targetUser.use_password ?? true;
+  DOM.modalUserForm.classList.add('active');
+  DOM.userFormNama.focus();
+  lucide.createIcons();
+};
+
+function closeUserModal() {
+  if (DOM.modalUserForm) {
+    DOM.modalUserForm.classList.remove('active');
+  }
+}
+
+async function handleSaveUserForm() {
+  const userId = DOM.userFormId.value.trim();
+  const nik = DOM.userFormNik.value.trim();
+  const nama = DOM.userFormNama.value.trim();
+  const psw = DOM.userFormPsw.value.trim();
+  const usePsw = DOM.userFormPswToggle.checked;
+
+  if (!nik) {
+    showToast('Harap isi NIK Teknisi!', 'error');
+    DOM.userFormNik.focus();
+    return;
+  }
+  if (!nama) {
+    showToast('Harap isi Nama Teknisi!', 'error');
+    DOM.userFormNama.focus();
+    return;
+  }
+
+  DOM.btnSaveUserForm.disabled = true;
+  DOM.btnSaveUserForm.innerHTML = `<i data-lucide="loader-2" class="spin"></i> Menyimpan...`;
+  lucide.createIcons();
+
+  try {
+    if (!state.supabaseClient) {
+      throw new Error('Koneksi Supabase belum siap!');
+    }
+
+    if (userId) {
+      // UPDATE EXISTING USER IN SUPABASE
+      const { error } = await state.supabaseClient
+        .from('users_teknisi')
+        .update({
+          nik: nik,
+          nama: nama,
+          password: psw,
+          use_password: usePsw,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', userId);
+
+      if (error) throw error;
+      showToast(`⚡ User (${nik}) Berhasil Diperbarui!`, 'success');
+    } else {
+      // INSERT NEW USER INTO SUPABASE
+      const { error } = await state.supabaseClient
+        .from('users_teknisi')
+        .insert([{
+          nik: nik,
+          nama: nama,
+          password: psw,
+          use_password: usePsw
+        }]);
+
+      if (error) throw error;
+      showToast(`⚡ User Baru (${nik}) Berhasil Ditambahkan!`, 'success');
+    }
+
+    closeUserModal();
+    fetchAdminUsersList();
+
+  } catch (err) {
+    console.error('Save user error:', err);
+    showToast(`Gagal simpan user: ${err.message}`, 'error');
+  } finally {
+    DOM.btnSaveUserForm.disabled = false;
+    DOM.btnSaveUserForm.innerHTML = `<i data-lucide="save"></i> <span id="user-form-submit-text">${userId ? 'Perbarui User' : 'Simpan User'}</span>`;
+    lucide.createIcons();
+  }
+}
+
+window.confirmDeleteUser = function(userId, userNik) {
+  state.modalAction = 'deleteUser';
+  state.pendingDeleteUserId = userId;
+  state.pendingDeleteUserNik = userNik;
+
+  DOM.modalConfirmTitle.innerHTML = `<i data-lucide="trash-2"></i> Konfirmasi Hapus User`;
+  DOM.modalConfirmMsg.textContent = `Apakah Anda yakin ingin menghapus user (${userNik}) secara permanen?`;
+  DOM.modalConfirmOkText.textContent = 'Ya, Hapus User';
+  DOM.modalConfirm.classList.add('active');
+  lucide.createIcons();
+};
+
+async function performDeleteUser() {
+  if (!state.pendingDeleteUserId || !state.supabaseClient) return;
+
+  try {
+    const { error } = await state.supabaseClient
+      .from('users_teknisi')
+      .delete()
+      .eq('id', state.pendingDeleteUserId);
+
+    if (error) throw error;
+
+    showToast(`🗑️ User (${state.pendingDeleteUserNik}) Berhasil Dihapus!`, 'info');
+    fetchAdminUsersList();
+  } catch (err) {
+    console.error('Delete user error:', err);
+    showToast(`Gagal hapus user: ${err.message}`, 'error');
+  } finally {
+    state.pendingDeleteUserId = null;
+    state.pendingDeleteUserNik = null;
+  }
 }
