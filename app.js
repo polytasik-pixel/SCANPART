@@ -97,6 +97,11 @@ const DOM = {
   btnConfirmCancel: document.getElementById('btn-confirm-cancel'),
   btnConfirmOk: document.getElementById('btn-confirm-ok'),
   
+  // Blocking Queue Modal (No buttons)
+  modalQueue: document.getElementById('modal-queue'),
+  modalQueueMsg: document.getElementById('modal-queue-msg'),
+  queueStatusText: document.getElementById('queue-status-text'),
+  
   // Profile Form
   profileNama: document.getElementById('profile-nama'),
   profileNik: document.getElementById('profile-nik'),
@@ -206,6 +211,14 @@ function showLoginScreen() {
   DOM.screenApp.classList.remove('active');
   stopScanner();
   unsubscribeRealtime();
+  if (state.globalQueuePollTimer) {
+    clearInterval(state.globalQueuePollTimer);
+    state.globalQueuePollTimer = null;
+  }
+  if (state.globalQueueChannel && state.supabaseClient) {
+    state.supabaseClient.removeChannel(state.globalQueueChannel);
+    state.globalQueueChannel = null;
+  }
 }
 
 function showAppScreen() {
@@ -214,6 +227,7 @@ function showAppScreen() {
 
   updateUIFromState();
   subscribeRealtimeSettings();
+  subscribeGlobalQueueRealtime();
   startScanner();
 }
 
@@ -632,6 +646,13 @@ function performLogout() {
   showToast('Anda telah keluar dari akun.', 'info');
 }
 
+function performClearHistory() {
+  state.history = [];
+  localStorage.removeItem(STORAGE_KEYS.HISTORY);
+  renderHistory();
+  showToast('Riwayat berhasil dibersihkan', 'info');
+}
+
 function switchTab(targetTabId) {
   DOM.navItems.forEach(item => {
     item.classList.toggle('active', item.getAttribute('data-target') === targetTabId);
@@ -800,7 +821,7 @@ function vibrateDevice() {
 }
 
 // ==========================================
-// SUBMIT BATCH TO SUPABASE
+// SUBMIT BATCH TO SUPABASE & QUEUE SYSTEM
 // ==========================================
 async function handleSubmitBatchToSupabase() {
   if (state.draftList.length === 0) return;
@@ -815,19 +836,23 @@ async function handleSubmitBatchToSupabase() {
     qty: item.qty,
     use_password: state.profile.usePsw,
     password: state.profile.usePsw ? (state.profile.psw || '') : '',
+    status: 'pending',
     created_at: new Date().toISOString()
   }));
 
   try {
     let isSupabaseSuccess = false;
+    let insertedIds = [];
 
     if (state.supabaseClient) {
       const { data, error } = await state.supabaseClient
         .from(SUPABASE_CONFIG.table)
-        .insert(batchPayloads);
+        .insert(batchPayloads)
+        .select('id, status');
 
       if (error) throw error;
       isSupabaseSuccess = true;
+      if (data) insertedIds = data.map(d => d.id);
     }
 
     // Save to Local History Log
@@ -847,7 +872,7 @@ async function handleSubmitBatchToSupabase() {
     renderDraftList();
 
     if (isSupabaseSuccess) {
-      showToast(`🚀 ${countSent} Item Berhasil Di-submit!`, 'success');
+      checkGlobalPendingQueueStatus();
     } else {
       showToast(`✅ ${countSent} Item Tersimpan (Mode Demo)`, 'info');
     }
@@ -857,6 +882,81 @@ async function handleSubmitBatchToSupabase() {
   } finally {
     DOM.btnSubmit.disabled = state.draftList.length === 0;
     renderDraftList();
+  }
+}
+
+// ==========================================
+// GLOBAL REALTIME QUEUE MONITORING ACROSS ALL DEVICES
+// ==========================================
+function subscribeGlobalQueueRealtime() {
+  if (!state.supabaseClient) return;
+
+  if (state.globalQueueChannel) {
+    state.supabaseClient.removeChannel(state.globalQueueChannel);
+    state.globalQueueChannel = null;
+  }
+
+  // Initial check upon load
+  checkGlobalPendingQueueStatus();
+
+  // Supabase Realtime Listener on ALL transaksi_part events (INSERT, UPDATE, DELETE)
+  state.globalQueueChannel = state.supabaseClient
+    .channel('global_queue_monitor')
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: SUPABASE_CONFIG.table },
+      (payload) => {
+        console.log('Realtime Global Queue Change:', payload);
+        checkGlobalPendingQueueStatus();
+      }
+    )
+    .subscribe();
+
+  // Periodic Polling Fallback every 2.5 seconds
+  if (!state.globalQueuePollTimer) {
+    state.globalQueuePollTimer = setInterval(checkGlobalPendingQueueStatus, 2500);
+  }
+}
+
+async function checkGlobalPendingQueueStatus() {
+  if (!state.supabaseClient || !state.isLoggedIn) return;
+
+  try {
+    const { data, error } = await state.supabaseClient
+      .from(SUPABASE_CONFIG.table)
+      .select('id, status')
+      .in('status', ['pending', 'processing'])
+      .limit(5);
+
+    if (error) return;
+
+    const hasPending = data && data.length > 0;
+
+    if (hasPending) {
+      openGlobalQueueModal();
+    } else {
+      closeGlobalQueueModal();
+    }
+  } catch (err) {
+    console.warn('Check global queue error:', err);
+  }
+}
+
+function openGlobalQueueModal() {
+  if (!state.isGlobalQueueBlocking) {
+    state.isGlobalQueueBlocking = true;
+    if (DOM.modalQueueMsg) DOM.modalQueueMsg.textContent = 'TERDAPAT TRANSAKSI YANG BELUM / SEDANG DI PROSES. MOHON MENUNGGU...';
+    if (DOM.queueStatusText) DOM.queueStatusText.textContent = 'MENGANTRI / DIPROSES...';
+    if (DOM.modalQueue) DOM.modalQueue.classList.add('active');
+    lucide.createIcons();
+  }
+}
+
+function closeGlobalQueueModal() {
+  if (state.isGlobalQueueBlocking) {
+    state.isGlobalQueueBlocking = false;
+    if (DOM.modalQueue) DOM.modalQueue.classList.remove('active');
+    showToast('🚀 Transfer Berhasil!', 'success');
   }
 }
 
