@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <title>App Scan Part Gudang Teknisi</title>
+  
+  <!-- Google Fonts: Plus Jakarta Sans -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  
+  <!-- HTML5 QR Code Scanner Library -->
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+  
+  <!-- Supabase JS CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <!-- Mobile App Frame Container -->
+  <div class="app-container" id="app-root">
+    
+    <!-- ==========================================
+         HALAMAN LOGIN (LOGIN SCREEN)
+         ========================================== -->
+    <div id="screen-login" class="screen active">
+      <div class="login-wrapper">
+        <div class="login-header">
+          <div class="login-logo">
+            <i data-lucide="user"></i>
+          </div>
+          <h2>App Scan Teknisi</h2>
+          <p>Masukkan Username / NIK dan Password Anda</p>
+        </div>
+
+        <form id="form-login" onsubmit="return false;" class="login-form">
+          <div class="form-group">
+            <label for="login-username">Username / NIK Teknisi</label>
+            <div class="input-icon-wrapper">
+              <i data-lucide="user" class="input-icon"></i>
+              <input type="text" id="login-username" placeholder="Contoh: TEK-8829 / budi" required />
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="login-password">Password</label>
+            <div class="input-icon-wrapper">
+              <input type="password" id="login-password" placeholder="Password akun..." required style="padding-left:12px;" />
+              <button type="button" id="btn-login-psw-toggle" class="btn-clear" title="Lihat Password">
+                <i data-lucide="eye" id="login-psw-eye"></i>
+              </button>
+            </div>
+          </div>
+
+          <div class="remember-row">
+            <label class="checkbox-container">
+              <input type="checkbox" id="remember-me" checked />
+              <span class="checkmark"></span>
+              <span>Simpan Username & Password</span>
+            </label>
+          </div>
+
+          <button type="button" id="btn-do-login" class="btn btn-primary btn-block btn-md">
+            <i data-lucide="log-in"></i>
+            <span>MASUK APLIKASI</span>
+          </button>
+        </form>
+      </div>
+    </div>
+
+
+    <!-- ==========================================
+         HALAMAN UTAMA APLIKASI (MAIN APP SCREEN)
+         ========================================== -->
+    <div id="screen-app" class="screen">
+      
+      <!-- Top Header -->
+      <header class="app-header">
+        <div class="header-info">
+          <div class="header-text">
+            <h1 id="header-nama">Teknisi (Belum Diset)</h1>
+            <span class="nik-badge" id="header-nik"><i data-lucide="id-card"></i> NIK: -</span>
+          </div>
+        </div>
+        <div class="header-psw-badge" id="header-psw-status">
+          <i data-lucide="shield-check"></i> <span id="header-psw-text">PSW: ON</span>
+        </div>
+      </header>
+
+      <!-- App Main Body (Tabs Container) -->
+      <main class="app-body">
+        
+        <!-- TAB 1: SCAN & DAFTAR PART -->
+        <section id="tab-scan" class="tab-content active">
+          
+          <!-- Camera Scanner Card -->
+          <div class="card scanner-card">
+            <div class="card-header">
+              <div class="card-title">
+                <i data-lucide="qr-code"></i> Scanner Barcode Part
+              </div>
+              <div class="camera-actions">
+                <button id="btn-toggle-camera" class="btn-icon" title="Nyalakan/Matikan Kamera">
+                  <i data-lucide="camera"></i>
+                </button>
+              </div>
+            </div>
+
+            <!-- Direct Camera Stream Container -->
+            <div id="reader-container" class="reader-wrapper">
+              <div id="reader"></div>
+            </div>
+
+            <!-- Quick Test Simulasi Scan Button -->
+            <div class="simulasi-wrapper">
+              <button id="btn-simulasi-scan" class="btn btn-ghost btn-xs">
+                <i data-lucide="zap"></i> Simulasi Scan Barcode Acak
+              </button>
+            </div>
+          </div>
+
+          <!-- Draft Review List Card (Daftar Part Ter-Scan) -->
+          <div class="card draft-card">
+            <div class="card-header">
+              <div class="card-title">
+                <i data-lucide="list-checks"></i> Daftar Part Ter-Scan
+                <span class="badge-count" id="draft-count">0 Item</span>
+              </div>
+            </div>
+
+            <!-- Quick Manual Add Input Line -->
+            <div class="manual-add-row">
+              <div class="input-icon-wrapper flex-1">
+                <i data-lucide="barcode" class="input-icon"></i>
+                <input type="text" id="input-no-gudang" placeholder="Ketik No. Gudang Manual..." autocomplete="off" />
+                <button id="btn-clear-gudang" class="btn-clear" title="Bersihkan">
+                  <i data-lucide="x"></i>
+                </button>
+              </div>
+              <button id="btn-add-manual" class="btn btn-secondary btn-icon-plus" title="Tambah Manual">
+                <i data-lucide="plus"></i>
+              </button>
+            </div>
+
+            <!-- Draft Items List -->
+            <div id="draft-list-container" class="draft-container">
+              <div class="empty-state-sm">
+                <i data-lucide="package-open"></i>
+                <p>Belum ada item di daftar. Arahkan kamera ke barcode atau ketik manual di atas.</p>
+              </div>
+            </div>
+
+            <!-- Submit All Button (Triggers Popup Confirmation) -->
+            <button id="btn-submit" class="btn btn-primary btn-block btn-md" disabled>
+              <i data-lucide="send"></i>
+              <span id="btn-submit-text">SUBMIT (0 ITEM)</span>
+            </button>
+          </div>
+
+        </section>
+
+        <!-- TAB 2: RIWAYAT / STATUS LOGS -->
+        <section id="tab-history" class="tab-content">
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">
+                <i data-lucide="history"></i> Riwayat Submit Data
+              </div>
+              <button id="btn-clear-history" class="btn-icon text-danger" title="Hapus Riwayat">
+                <i data-lucide="trash-2"></i>
+              </button>
+            </div>
+            <div id="history-list" class="history-container">
+              <div class="empty-state-sm">
+                <i data-lucide="inbox"></i>
+                <p>Belum ada riwayat pengiriman.</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- TAB 3: DEDICATED HALAMAN PROFIL -->
+        <section id="tab-profile" class="tab-content">
+          
+          <!-- Card Profil Header User -->
+          <div class="card profile-header-card">
+            <div class="profile-avatar-lg">
+              <i data-lucide="user-check"></i>
+            </div>
+            <div class="profile-details-text">
+              <h2 id="prof-disp-nama">Nama Teknisi</h2>
+              <span class="prof-badge-nik" id="prof-disp-nik">NIK: -</span>
+              <span class="prof-status-online"><i data-lucide="circle-dot"></i> Akun Teknisi Aktif</span>
+            </div>
+          </div>
+
+          <!-- Card Switcher Tema Tampilan -->
+          <div class="card theme-card">
+            <div class="card-title">
+              <i data-lucide="palette"></i> Pilihan Tema Tampilan
+            </div>
+            <div class="theme-options-grid">
+              <button type="button" class="btn-theme-opt active" id="btn-theme-dark" data-theme-val="dark">
+                <i data-lucide="moon"></i> Dark Slate (Default)
+              </button>
+              <button type="button" class="btn-theme-opt" id="btn-theme-light" data-theme-val="light">
+                <i data-lucide="sun"></i> Terang (Light)
+              </button>
+            </div>
+          </div>
+
+          <!-- Card Form Edit Profil -->
+          <div class="card">
+            <div class="card-title">
+              <i data-lucide="user-cog"></i> Pengaturan Akun Teknisi
+            </div>
+
+            <form id="form-profile" onsubmit="return false;">
+              <div class="form-group">
+                <label for="profile-nama">Nama Teknisi</label>
+                <div class="input-icon-wrapper">
+                  <i data-lucide="user" class="input-icon"></i>
+                  <input type="text" id="profile-nama" placeholder="Masukkan nama..." required />
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label for="profile-nik">NIK (Nomor Induk Karyawan)</label>
+                <div class="input-icon-wrapper">
+                  <i data-lucide="id-card" class="input-icon"></i>
+                  <input type="text" id="profile-nik" placeholder="Contoh: TEK-1092" required />
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label for="profile-psw">Password Akses Web Target</label>
+                <div class="input-icon-wrapper">
+                  <input type="password" id="profile-psw" placeholder="Password akun web..." style="padding-left:12px;" />
+                  <button type="button" id="btn-toggle-psw-visibility" class="btn-clear" title="Lihat Password">
+                    <i data-lucide="eye" id="psw-eye-icon"></i>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Switch Status PSW -->
+              <div class="switch-card">
+                <div class="switch-info">
+                  <div class="switch-label">
+                    <i data-lucide="shield-check"></i> STATUS PSW
+                  </div>
+                </div>
+                <label class="toggle-switch">
+                  <input type="checkbox" id="profile-psw-toggle" />
+                  <span class="slider"></span>
+                </label>
+              </div>
+
+              <button type="button" id="btn-save-profile" class="btn btn-primary btn-block btn-sm">
+                <i data-lucide="save"></i> Simpan Profil & Pengaturan
+              </button>
+            </form>
+          </div>
+
+          <!-- Tombol Logout -->
+          <div class="logout-wrapper">
+            <button type="button" id="btn-logout" class="btn btn-ghost btn-block btn-sm text-danger">
+              <i data-lucide="log-out"></i> KELUAR AKUN (LOGOUT)
+            </button>
+          </div>
+
+        </section>
+
+      </main>
+
+      <!-- Bottom Navigation Bar -->
+      <nav class="app-nav">
+        <button class="nav-item active" data-target="tab-scan">
+          <i data-lucide="qr-code"></i>
+          <span>Scan Part</span>
+        </button>
+        <button class="nav-item" data-target="tab-history">
+          <i data-lucide="history"></i>
+          <span>Riwayat</span>
+        </button>
+        <button class="nav-item" data-target="tab-profile">
+          <i data-lucide="user-cog"></i>
+          <span>Profil</span>
+        </button>
+      </nav>
+
+    </div>
+
+    <!-- ==========================================
+         CENTERED POPUP CONFIRMATION MODAL (YA / TIDAK)
+         ========================================== -->
+    <div id="modal-confirm" class="modal-overlay">
+      <div class="modal-card">
+        <div class="modal-header">
+          <div class="modal-title" id="modal-confirm-title">
+            <i data-lucide="help-circle"></i> Konfirmasi Kirim Data
+          </div>
+        </div>
+        <div class="modal-body text-center">
+          <p id="modal-confirm-msg" class="modal-msg-center">Apakah Anda Yakin Melakukan Request?</p>
+        </div>
+        <div class="modal-footer">
+          <button id="btn-confirm-cancel" class="btn btn-ghost btn-sm">Batal</button>
+          <button id="btn-confirm-ok" class="btn btn-primary btn-sm">
+            <i data-lucide="check"></i> <span id="modal-confirm-ok-text">Ya, Kirim Data</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Toast Notification Container -->
+    <div id="toast-container" class="toast-wrapper"></div>
+
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
