@@ -34,6 +34,7 @@ let state = {
   pendingDeleteUserNik: null,
   html5Qrcode: null,
   isScanning: false,
+  isTorchOn: false,
   supabaseClient: null,
   realtimeChannel: null,
   adminUsersChannel: null
@@ -80,6 +81,7 @@ const DOM = {
   
   // Scan & Camera
   btnToggleCamera: document.getElementById('btn-toggle-camera'),
+  btnToggleTorch: document.getElementById('btn-toggle-torch'),
   btnSimulasiScan: document.getElementById('btn-simulasi-scan'),
   readerContainer: document.getElementById('reader-container'),
   
@@ -390,6 +392,7 @@ function setupEventListeners() {
 
   // Camera Scanner Buttons
   DOM.btnToggleCamera.addEventListener('click', toggleScanner);
+  if (DOM.btnToggleTorch) DOM.btnToggleTorch.addEventListener('click', toggleTorch);
   if (DOM.btnSimulasiScan) DOM.btnSimulasiScan.addEventListener('click', simulateScan);
 
   // Manual Add Line
@@ -815,7 +818,7 @@ window.removeDraftItem = function(id) {
 };
 
 // ==========================================
-// BARCODE SCANNER ENGINE
+// BARCODE SCANNER ENGINE & TORCH (LIGHT)
 // ==========================================
 function startScanner() {
   if (state.isScanning || !state.isLoggedIn) return;
@@ -841,6 +844,9 @@ function startScanner() {
     onScanFailure
   ).then(() => {
     state.isScanning = true;
+    if (DOM.btnToggleTorch) {
+      DOM.btnToggleTorch.style.display = 'inline-flex';
+    }
   }).catch(err => {
     state.isScanning = false;
   });
@@ -850,6 +856,11 @@ function stopScanner() {
   if (state.html5Qrcode && state.isScanning) {
     state.html5Qrcode.stop().then(() => {
       state.isScanning = false;
+      state.isTorchOn = false;
+      updateTorchUI();
+      if (DOM.btnToggleTorch) {
+        DOM.btnToggleTorch.style.display = 'none';
+      }
     }).catch(err => console.error(err));
   }
 }
@@ -857,6 +868,68 @@ function stopScanner() {
 function toggleScanner() {
   if (state.isScanning) stopScanner();
   else startScanner();
+}
+
+function getActiveVideoTrack() {
+  const videoElem = document.querySelector('#reader video');
+  if (videoElem && videoElem.srcObject && typeof videoElem.srcObject.getVideoTracks === 'function') {
+    const tracks = videoElem.srcObject.getVideoTracks();
+    if (tracks && tracks.length > 0) return tracks[0];
+  }
+  return null;
+}
+
+async function toggleTorch() {
+  if (!state.isScanning) {
+    showToast('Nyalakan kamera terlebih dahulu!', 'error');
+    return;
+  }
+
+  const track = getActiveVideoTrack();
+  const nextTorchState = !state.isTorchOn;
+
+  try {
+    if (track && typeof track.applyConstraints === 'function') {
+      const capabilities = (typeof track.getCapabilities === 'function') ? track.getCapabilities() : {};
+      
+      if (capabilities && 'torch' in capabilities && !capabilities.torch) {
+        showToast('Lampu flash tidak didukung kamera ini', 'error');
+        return;
+      }
+
+      await track.applyConstraints({
+        advanced: [{ torch: nextTorchState }]
+      });
+
+      state.isTorchOn = nextTorchState;
+      updateTorchUI();
+      showToast(`Lampu Flash: ${state.isTorchOn ? 'ON 💡' : 'OFF 🌙'}`, 'info');
+      return;
+    }
+
+    if (state.html5Qrcode && typeof state.html5Qrcode.applyVideoConstraints === 'function') {
+      await state.html5Qrcode.applyVideoConstraints({
+        advanced: [{ torch: nextTorchState }]
+      });
+      state.isTorchOn = nextTorchState;
+      updateTorchUI();
+      showToast(`Lampu Flash: ${state.isTorchOn ? 'ON 💡' : 'OFF 🌙'}`, 'info');
+      return;
+    }
+
+    showToast('Fitur lampu flash tidak didukung oleh browser ini', 'error');
+
+  } catch (err) {
+    console.error('Torch error:', err);
+    showToast('Gagal mengubah status lampu flash', 'error');
+  }
+}
+
+function updateTorchUI() {
+  if (DOM.btnToggleTorch) {
+    DOM.btnToggleTorch.classList.toggle('active', state.isTorchOn);
+    DOM.btnToggleTorch.title = state.isTorchOn ? 'Matikan Lampu Flash' : 'Nyalakan Lampu Flash';
+  }
 }
 
 function onScanSuccess(decodedText) {

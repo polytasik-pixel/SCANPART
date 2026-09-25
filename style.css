@@ -474,6 +474,19 @@ body {
   overflow: hidden; /* Ensure camera stays strictly inside scanner card */
 }
 
+.camera-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+#btn-toggle-torch.active {
+  background-color: var(--warning);
+  color: #0f172a;
+  border-color: var(--warning);
+  box-shadow: 0 0 10px rgba(245, 158, 11, 0.5);
+}
+
 .reader-wrapper {
   width: 100%;
   flex: 1;
