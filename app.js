@@ -1321,16 +1321,16 @@ async function checkGlobalPendingQueueStatus() {
   try {
     const { data, error } = await state.supabaseClient
       .from(SUPABASE_CONFIG.table)
-      .select('id, status')
+      .select('id, status, teknisi_nik')
       .in('status', ['pending', 'processing'])
-      .limit(5);
+      .limit(20);
 
     if (error) return;
 
     const hasPending = data && data.length > 0;
 
     if (hasPending) {
-      openGlobalQueueModal();
+      openGlobalQueueModal(data);
     } else {
       closeGlobalQueueModal();
     }
@@ -1339,10 +1339,22 @@ async function checkGlobalPendingQueueStatus() {
   }
 }
 
-function openGlobalQueueModal() {
+function openGlobalQueueModal(pendingRecords = []) {
+  const currentNik = String(state.profile.nik || '').trim();
+
+  // Cek apakah transaksi yang pending ini adalah milik user yang sedang login sendiri
+  const isSelfTransaction = pendingRecords.some(r => String(r.teknisi_nik || '').trim() === currentNik);
+
+  if (DOM.modalQueueMsg) {
+    if (isSelfTransaction) {
+      DOM.modalQueueMsg.textContent = 'Transaksi sedang di proses mohon menunggu...';
+    } else {
+      DOM.modalQueueMsg.textContent = 'TERDAPAT TRANSAKSI YANG SEDANG DI PROSES. MOHON MENUNGGU...';
+    }
+  }
+
   if (!state.isGlobalQueueBlocking) {
     state.isGlobalQueueBlocking = true;
-    if (DOM.modalQueueMsg) DOM.modalQueueMsg.textContent = 'TERDAPAT TRANSAKSI YANG BELUM / SEDANG DI PROSES. MOHON MENUNGGU...';
     if (DOM.queueStatusText) DOM.queueStatusText.textContent = 'MENGANTRI / DIPROSES...';
     if (DOM.modalQueue) DOM.modalQueue.classList.add('active');
     lucide.createIcons();
