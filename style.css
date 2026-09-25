@@ -512,8 +512,8 @@ body {
 .scanner-card {
   display: flex;
   flex-direction: column;
-  flex: 0 0 225px;
-  height: 225px;
+  flex: 0 0 245px;
+  height: 245px;
   overflow: hidden; /* Camera stays strictly inside scanner card and never shrinks */
 }
 

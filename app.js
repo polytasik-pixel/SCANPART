@@ -1195,10 +1195,14 @@ async function handleSubmitBatchToSupabase() {
   // Generate a single unique Batch/Header Unit ID for this submit action
   const batchUnitId = 'UNIT-' + Date.now() + '-' + Math.floor(1000 + Math.random() * 9000);
 
+  const currentNik = (state.profile.nik || '').trim();
+  const jenisUser = (currentNik === '02002105') ? 'SALES' : 'TEKNISI';
+
   const batchPayloads = state.draftList.map(item => ({
     unit_id: batchUnitId,
-    teknisi_nik: state.profile.nik || 'TEK-0000',
+    teknisi_nik: currentNik || 'TEK-0000',
     nama_teknisi: state.profile.nama || 'Teknisi Anonim',
+    jenis: jenisUser,
     no_gudang: item.no_gudang,
     qty: item.qty,
     use_password: state.profile.usePsw,
@@ -1217,19 +1221,31 @@ async function handleSubmitBatchToSupabase() {
         .insert(batchPayloads)
         .select('id, status');
 
-      // Fallback if unit_id column does not exist in Supabase schema yet
-      if (error && error.message && error.message.includes('unit_id')) {
-        console.warn('unit_id column missing in Supabase, retrying without unit_id field...');
-        const fallbackPayloads = batchPayloads.map(({ unit_id, ...rest }) => rest);
-        const resFallback = await state.supabaseClient
-          .from(SUPABASE_CONFIG.table)
-          .insert(fallbackPayloads)
-          .select('id, status');
-        if (resFallback.error) throw resFallback.error;
-        data = resFallback.data;
-        error = null;
-      } else if (error) {
-        throw error;
+      // Fallback if unit_id or jenis column does not exist in Supabase schema yet
+      if (error && error.message) {
+        const hasMissingUnit = error.message.includes('unit_id');
+        const hasMissingJenis = error.message.includes('jenis');
+
+        if (hasMissingUnit || hasMissingJenis) {
+          console.warn('Column missing in Supabase schema, retrying fallback payload...', error.message);
+          const fallbackPayloads = batchPayloads.map(p => {
+            const payloadCopy = { ...p };
+            if (hasMissingUnit) delete payloadCopy.unit_id;
+            if (hasMissingJenis) delete payloadCopy.jenis;
+            return payloadCopy;
+          });
+
+          const resFallback = await state.supabaseClient
+            .from(SUPABASE_CONFIG.table)
+            .insert(fallbackPayloads)
+            .select('id, status');
+
+          if (resFallback.error) throw resFallback.error;
+          data = resFallback.data;
+          error = null;
+        } else {
+          throw error;
+        }
       }
 
       isSupabaseSuccess = true;
