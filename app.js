@@ -18,6 +18,7 @@ const STORAGE_KEYS = {
 let state = {
   isLoggedIn: false,
   isAdmin: false,
+  activeTab: 'tab-scan',
   theme: 'dark', // 'dark' | 'light'
   modalAction: null, // 'submit' | 'logout' | 'clearHistory' | 'deleteUser'
   profile: {
@@ -30,10 +31,14 @@ let state = {
   draftList: [],
   history: [],
   adminUsers: [],
+  pendingDeleteDraftItemId: null,
   pendingDeleteUserId: null,
   pendingDeleteUserNik: null,
+  pendingTargetTabId: null,
+  isReloading: false,
   html5Qrcode: null,
   isScanning: false,
+  wasScanningBeforeSleep: false,
   isTorchOn: false,
   supabaseClient: null,
   realtimeChannel: null,
@@ -263,6 +268,7 @@ function showAppScreen() {
   DOM.screenLogin.classList.remove('active');
   DOM.screenApp.classList.add('active');
 
+  switchTab('tab-scan', false);
   updateUIFromState();
   subscribeRealtimeSettings();
   subscribeGlobalQueueRealtime();
@@ -386,7 +392,7 @@ function setupEventListeners() {
   // Navigation Tabs
   DOM.navItems.forEach(item => {
     item.addEventListener('click', () => {
-      switchTab(item.getAttribute('data-target'));
+      requestTabSwitch(item.getAttribute('data-target'));
     });
   });
 
@@ -412,7 +418,8 @@ function setupEventListeners() {
   DOM.btnConfirmCancel.addEventListener('click', closeSubmitConfirmModal);
   DOM.btnConfirmOk.addEventListener('click', handleConfirmModalOk);
 
-  // Profile Save
+  // Profile Save & Header PSW Badge Click Toggle
+  if (DOM.headerPswStatus) DOM.headerPswStatus.addEventListener('click', handleHeaderPswToggle);
   DOM.btnSaveProfile.addEventListener('click', handleSaveProfileRealtime);
   DOM.profilePswToggle.addEventListener('change', handleTogglePasswordRealtime);
 
@@ -430,6 +437,75 @@ function setupEventListeners() {
   if (DOM.btnCloseUserModal) DOM.btnCloseUserModal.addEventListener('click', closeUserModal);
   if (DOM.btnCancelUserForm) DOM.btnCancelUserForm.addEventListener('click', closeUserModal);
   if (DOM.btnSaveUserForm) DOM.btnSaveUserForm.addEventListener('click', handleSaveUserForm);
+
+  // Android & Hardware Back Button Navigation Handler
+  window.addEventListener('popstate', (e) => {
+    if (!state.isLoggedIn) return;
+
+    // 1. Close active modals first if open
+    if (DOM.modalUserForm && DOM.modalUserForm.classList.contains('active')) {
+      closeUserModal();
+      return;
+    }
+    if (DOM.modalConfirm && DOM.modalConfirm.classList.contains('active')) {
+      closeSubmitConfirmModal();
+      return;
+    }
+
+    // 2. Tab Navigation: check if leaving tab-scan with draft items
+    const targetTab = (e.state && e.state.tab) ? e.state.tab : 'tab-scan';
+    requestTabSwitch(targetTab);
+  });
+
+  // Intercept Keyboard Refresh Shortcuts (F5, Ctrl+R, Cmd+R) and show custom centered popup modal
+  window.addEventListener('keydown', (e) => {
+    const isF5 = e.key === 'F5' || e.keyCode === 116;
+    const isCtrlR = (e.ctrlKey || e.metaKey) && (e.key === 'r' || e.key === 'R' || e.keyCode === 82);
+
+    if ((isF5 || isCtrlR) && state.isLoggedIn && state.draftList.length > 0) {
+      e.preventDefault();
+      e.stopPropagation();
+
+      state.modalAction = 'refreshWarn';
+      DOM.modalConfirmTitle.innerHTML = `<i data-lucide="alert-triangle"></i> Konfirmasi Muat Ulang Halaman`;
+      DOM.modalConfirmMsg.textContent = 'No gudang yg sudah di input akan hilang. Lanjutkan?';
+      DOM.modalConfirmOkText.textContent = 'Ya, Lanjutkan';
+      DOM.modalConfirm.classList.add('active');
+      lucide.createIcons();
+      return false;
+    }
+  });
+
+  // Warn user before refresh / closing browser tab if unsubmitted draft items exist
+  window.addEventListener('beforeunload', (e) => {
+    if (state.isReloading) return;
+
+    if (state.isLoggedIn && state.draftList.length > 0) {
+      const msg = 'No gudang yg sudah di input akan hilang. Lanjutkan?';
+      e.preventDefault();
+      e.returnValue = msg;
+      return msg;
+    }
+  });
+
+  // Auto-Resume Camera when screen turns back on / phone is unlocked / app brought to foreground
+  document.addEventListener('visibilitychange', () => {
+    if (!state.isLoggedIn) return;
+
+    if (document.visibilityState === 'hidden') {
+      if (state.isScanning) {
+        state.wasScanningBeforeSleep = true;
+        stopScanner();
+      }
+    } else if (document.visibilityState === 'visible') {
+      if (state.wasScanningBeforeSleep && state.activeTab === 'tab-scan') {
+        state.wasScanningBeforeSleep = false;
+        setTimeout(() => {
+          startScanner();
+        }, 300);
+      }
+    }
+  });
 }
 
 // ==========================================
@@ -486,6 +562,21 @@ async function handleConfirmModalOk() {
     performClearHistory();
   } else if (currentAction === 'deleteUser') {
     await performDeleteUser();
+  } else if (currentAction === 'deleteDraftItem') {
+    performRemoveDraftItem();
+  } else if (currentAction === 'switchTabWarn') {
+    state.draftList = [];
+    renderDraftList();
+    if (state.pendingTargetTabId) {
+      const nextTab = state.pendingTargetTabId;
+      state.pendingTargetTabId = null;
+      switchTab(nextTab, true);
+    }
+  } else if (currentAction === 'refreshWarn') {
+    state.draftList = [];
+    renderDraftList();
+    state.isReloading = true;
+    location.reload();
   }
 }
 
@@ -575,8 +666,45 @@ async function handleSaveProfileRealtime() {
   }
 }
 
+async function handleHeaderPswToggle() {
+  const nextPswState = !state.profile.usePsw;
+  state.profile.usePsw = nextPswState;
+
+  if (DOM.profilePswToggle) {
+    DOM.profilePswToggle.checked = nextPswState;
+  }
+
+  saveProfileSilently();
+  updateUIFromState();
+
+  if (state.supabaseClient && (state.profile.id || state.profile.nik)) {
+    try {
+      let query = state.supabaseClient
+        .from('users_teknisi')
+        .update({
+          use_password: nextPswState,
+          updated_at: new Date().toISOString()
+        });
+
+      if (state.profile.id) query = query.eq('id', state.profile.id);
+      else query = query.eq('nik', state.profile.nik);
+
+      const { error } = await query;
+      if (error) throw error;
+
+      showToast(`⚡ Status Password: ${nextPswState ? 'ON 🛡️' : 'OFF ⚠️'}`, 'success');
+    } catch (err) {
+      showToast(`Gagal update status password: ${err.message}`, 'error');
+    }
+  } else {
+    showToast(`⚡ Status Password: ${nextPswState ? 'ON 🛡️' : 'OFF ⚠️'} (Lokal)`, 'info');
+  }
+}
+
 async function handleTogglePasswordRealtime() {
   const newUsePsw = DOM.profilePswToggle.checked;
+  if (state.profile.usePsw === newUsePsw) return;
+
   state.profile.usePsw = newUsePsw;
   saveProfileSilently();
   updateUIFromState();
@@ -596,7 +724,7 @@ async function handleTogglePasswordRealtime() {
       const { error } = await query;
       if (error) throw error;
 
-      showToast(`⚡ Status Password: ${newUsePsw ? 'ON' : 'OFF'}`, 'success');
+      showToast(`⚡ Status Password: ${newUsePsw ? 'ON 🛡️' : 'OFF ⚠️'}`, 'success');
     } catch (err) {
       showToast(`Gagal update status password: ${err.message}`, 'error');
     }
@@ -722,13 +850,41 @@ function performClearHistory() {
   showToast('Riwayat berhasil dibersihkan', 'info');
 }
 
-function switchTab(targetTabId) {
+function switchTab(targetTabId, pushState = true) {
+  if (state.activeTab === targetTabId) return;
+
+  if (pushState) {
+    try {
+      history.pushState({ tab: targetTabId }, '', '#' + targetTabId);
+    } catch (e) {}
+  }
+  state.activeTab = targetTabId;
+
   DOM.navItems.forEach(item => {
     item.classList.toggle('active', item.getAttribute('data-target') === targetTabId);
   });
   DOM.tabContents.forEach(content => {
     content.classList.toggle('active', content.id === targetTabId);
   });
+}
+
+function requestTabSwitch(targetTabId) {
+  if (state.activeTab === targetTabId) return;
+
+  // Jika sedang di tab-scan dan ada item yang belum di-submit di daftar (draftList > 0), minta konfirmasi!
+  if (state.activeTab === 'tab-scan' && state.draftList.length > 0) {
+    state.modalAction = 'switchTabWarn';
+    state.pendingTargetTabId = targetTabId;
+
+    DOM.modalConfirmTitle.innerHTML = `<i data-lucide="alert-triangle"></i> Konfirmasi Pindah Halaman`;
+    DOM.modalConfirmMsg.textContent = 'No gudang yg sudah di input akan hilang. Lanjutkan?';
+    DOM.modalConfirmOkText.textContent = 'Ya, Lanjutkan';
+    DOM.modalConfirm.classList.add('active');
+    lucide.createIcons();
+    return;
+  }
+
+  switchTab(targetTabId, true);
 }
 
 // ==========================================
@@ -747,22 +903,27 @@ function handleAddManualItem() {
 }
 
 function addItemToDraft(code, qty = 1) {
+  if (!code) return;
+  const upperCode = String(code).trim().toUpperCase();
+
+  const existingItem = state.draftList.find(i => i.no_gudang.toUpperCase() === upperCode);
+  
+  // Jika part sudah pernah di-scan, abaikan secara diam-diam (tanpa notif / beep / getar)
+  if (existingItem) {
+    return;
+  }
+
+  // Hanya bunyikan beep & getar untuk part baru yang belum pernah di-scan
   playBeepSound();
   vibrateDevice();
 
-  const existingItem = state.draftList.find(i => i.no_gudang.toLowerCase() === code.toLowerCase());
-  if (existingItem) {
-    existingItem.qty += qty;
-    showToast(`Qty ${code} diperbarui jadi: ${existingItem.qty}`, 'info');
-  } else {
-    state.draftList.push({
-      id: Date.now() + Math.random(),
-      no_gudang: code,
-      qty: qty
-    });
-    showToast(`Ditambahkan ke daftar: ${code}`, 'success');
-  }
+  state.draftList.push({
+    id: Date.now() + Math.random(),
+    no_gudang: upperCode,
+    qty: 1
+  });
 
+  showToast(`Ditambahkan ke daftar: ${upperCode}`, 'success');
   renderDraftList();
 }
 
@@ -787,14 +948,24 @@ function renderDraftList() {
   DOM.draftListContainer.innerHTML = state.draftList.map(item => `
     <div class="draft-item">
       <div class="draft-item-left">
-        <i data-lucide="package" style="width:14px; height:14px; color:var(--primary);"></i>
         <span class="draft-code">${escapeHtml(item.no_gudang)}</span>
       </div>
       <div class="draft-qty-controls">
         <button type="button" onclick="changeDraftQty('${item.id}', -1)">-</button>
-        <span class="draft-qty-val">${item.qty}</span>
+        <input 
+          type="text" 
+          class="draft-qty-input" 
+          data-id="${item.id}"
+          value="${item.qty}" 
+          inputmode="numeric" 
+          pattern="[0-9]*" 
+          onfocus="this.select()"
+          onkeydown="return event.key === 'Backspace' || event.key === 'Delete' || event.key === 'ArrowLeft' || event.key === 'ArrowRight' || event.key === 'Tab' || (event.key >= '0' && event.key <= '9')"
+          oninput="this.value = this.value.replace(/[^0-9]/g, ''); updateDraftQtyDirect('${item.id}', this.value)"
+          onblur="updateDraftQtyDirect('${item.id}', this.value, true)"
+        />
         <button type="button" onclick="changeDraftQty('${item.id}', 1)">+</button>
-        <button type="button" class="btn-del-item" onclick="removeDraftItem('${item.id}')" title="Hapus Item">
+        <button type="button" class="btn-del-item" onclick="confirmRemoveDraftItem('${item.id}', '${escapeHtml(item.no_gudang)}')" title="Hapus Item">
           <i data-lucide="trash-2"></i>
         </button>
       </div>
@@ -812,10 +983,56 @@ window.changeDraftQty = function(id, delta) {
   }
 };
 
-window.removeDraftItem = function(id) {
-  state.draftList = state.draftList.filter(i => String(i.id) !== String(id));
-  renderDraftList();
+window.updateDraftQtyDirect = function(id, val, isBlur = false) {
+  const item = state.draftList.find(i => String(i.id) === String(id));
+  if (item) {
+    let cleanVal = String(val).replace(/[^0-9]/g, '');
+    let parsed = parseInt(cleanVal, 10);
+    
+    if (isNaN(parsed) || parsed < 1) {
+      item.qty = 1;
+      if (isBlur) {
+        const inputElem = document.querySelector(`.draft-qty-input[data-id="${id}"]`);
+        if (inputElem) inputElem.value = '1';
+        renderDraftList();
+        return;
+      }
+    } else {
+      item.qty = parsed;
+    }
+    
+    // Live update total count indicators
+    const count = state.draftList.reduce((acc, curr) => acc + curr.qty, 0);
+    const itemCount = state.draftList.length;
+    if (DOM.draftCount) DOM.draftCount.textContent = `${itemCount} Jenis (${count} Total)`;
+    if (DOM.btnSubmitText) DOM.btnSubmitText.textContent = `SUBMIT (${itemCount} ITEM)`;
+  }
 };
+
+window.confirmRemoveDraftItem = function(id, noGudang) {
+  state.modalAction = 'deleteDraftItem';
+  state.pendingDeleteDraftItemId = id;
+
+  DOM.modalConfirmTitle.innerHTML = `<i data-lucide="trash-2"></i> Konfirmasi Hapus Item`;
+  DOM.modalConfirmMsg.textContent = `Apakah Anda Yakin Ingin Menghapus (${noGudang}) dari Daftar Ter-Scan?`;
+  DOM.modalConfirmOkText.textContent = 'Ya, Hapus Item';
+  DOM.modalConfirm.classList.add('active');
+  lucide.createIcons();
+};
+
+function performRemoveDraftItem() {
+  if (!state.pendingDeleteDraftItemId) return;
+
+  const itemToDelete = state.draftList.find(i => String(i.id) === String(state.pendingDeleteDraftItemId));
+  state.draftList = state.draftList.filter(i => String(i.id) !== String(state.pendingDeleteDraftItemId));
+  
+  if (itemToDelete) {
+    showToast(`🗑️ Item (${itemToDelete.no_gudang}) Berhasil Dihapus!`, 'info');
+  }
+
+  renderDraftList();
+  state.pendingDeleteDraftItemId = null;
+}
 
 // ==========================================
 // BARCODE SCANNER ENGINE & TORCH (LIGHT)
@@ -830,10 +1047,9 @@ function startScanner() {
   const config = { 
     fps: 15, 
     qrbox: (viewfinderWidth, viewfinderHeight) => {
-      const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
-      const width = Math.floor(minEdge * 0.75);
-      const height = Math.floor(minEdge * 0.5);
-      return { width: Math.max(160, width), height: Math.max(100, height) };
+      const width = Math.max(160, Math.floor(viewfinderWidth - 16));
+      const height = Math.max(100, Math.floor(viewfinderHeight - 16));
+      return { width: width, height: height };
     } 
   };
 
