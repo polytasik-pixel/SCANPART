@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-  <title>APP SCAN PART</title>
+  <title>TASIKMALAYA</title>
   
   <!-- Google Fonts: Plus Jakarta Sans -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -37,7 +37,7 @@
           <div class="login-logo">
             <i data-lucide="user"></i>
           </div>
-          <h2>APP SCAN PART</h2>
+          <h2>TASIKMALAYA</h2>
           <p>Masukkan Username / NIK dan Password Anda</p>
         </div>
 
@@ -90,16 +90,66 @@
             <span class="nik-badge" id="header-nik"><i data-lucide="id-card"></i> NIK: -</span>
           </div>
         </div>
-        <div class="header-psw-badge" id="header-psw-status">
-          <i data-lucide="shield-check"></i> <span id="header-psw-text">PSW: ON</span>
+        <div class="header-right-actions">
+          <div class="header-psw-badge" id="header-psw-status">
+            <i data-lucide="shield-check"></i> <span id="header-psw-text">PSW: ON</span>
+          </div>
         </div>
       </header>
 
+      <!-- Sheet Live Data Status Bar (Direct Z2 Cell Content) -->
+      <div class="sheet-update-bar" id="sheet-update-bar">
+        <div class="sheet-update-left">
+          <strong id="sheet-z2-timestamp">Memuat...</strong>
+        </div>
+      </div>
+
       <!-- App Main Body (Tabs Container) -->
       <main class="app-body">
+
+        <!-- TAB 0: MENU UTAMA (HUB SELEKSI MODE APK SCAN / PORTAL TEKNISI) -->
+        <section id="tab-menu" class="tab-content active">
+          <div class="menu-hub-wrapper">
+            <div class="menu-hub-welcome">
+              <i data-lucide="sparkles"></i>
+              <h2>MENU UTAMA APLIKASI</h2>
+              <p>Pilih modul yang ingin Anda buka saat ini:</p>
+            </div>
+
+            <!-- MODE 1: TASIKMALAYA -->
+            <div class="mode-card mode-scan" id="btn-select-mode-scan">
+              <div class="mode-card-icon">
+                <i data-lucide="qr-code"></i>
+              </div>
+              <div class="mode-card-content">
+                <h3>1. TASIKMALAYA</h3>
+                <p>Scanner barcode kamera, input no. gudang manual & lihat riwayat submit.</p>
+                <div class="mode-card-btn">
+                  <span>BUKA TASIKMALAYA</span>
+                  <i data-lucide="arrow-right"></i>
+                </div>
+              </div>
+            </div>
+
+            <!-- MODE 2: PORTAL TEKNISI -->
+            <div class="mode-card mode-teknisi" id="btn-select-mode-teknisi">
+              <div class="mode-card-icon">
+                <i data-lucide="user-check"></i>
+              </div>
+              <div class="mode-card-content">
+                <h3>2. PORTAL TEKNISI</h3>
+                <p>Cek Data Case Pending, Insentif, Evaluasi Rata-Rata & Selisih Unit serta Output Hari Ini.</p>
+                <div class="mode-card-btn">
+                  <span>BUKA PORTAL TEKNISI</span>
+                  <i data-lucide="arrow-right"></i>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
         
         <!-- TAB 1: SCAN & DAFTAR PART -->
-        <section id="tab-scan" class="tab-content active">
+        <section id="tab-scan" class="tab-content">
           
           <!-- Camera Scanner Card -->
           <div class="card scanner-card">
@@ -164,7 +214,75 @@
 
         </section>
 
-        <!-- TAB 2: RIWAYAT / STATUS LOGS -->
+        <!-- TAB 2: PENDING CASES (GOOGLESHEET DATA COLS A1-JXXX) -->
+        <section id="tab-pending" class="tab-content">
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">
+                <i data-lucide="clock"></i> Data Case Pending
+                <span class="badge-count" id="pending-tech-count">0 Case</span>
+              </div>
+            </div>
+
+            <!-- Search Filter Bar -->
+            <div class="manual-add-row mb-12">
+              <div class="input-icon-wrapper flex-1">
+                <i data-lucide="search" class="input-icon"></i>
+                <input type="text" id="input-search-pending" placeholder="Cari No SCL, Type, Seri, Status..." autocomplete="off" />
+                <button id="btn-clear-search-pending" class="btn-clear" title="Clear Search" style="display:none;">
+                  <i data-lucide="x"></i>
+                </button>
+              </div>
+            </div>
+
+            <div id="pending-list-container" class="pending-container">
+              <div class="empty-state-sm">
+                <i data-lucide="loader-2" class="spin-lg"></i>
+                <p>Memuat data Pending dari Google Sheet...</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- TAB 3: PERFORMA & INSENTIF (COLS K-V, W-Y, K12-L20) -->
+        <section id="tab-performa" class="tab-content">
+          <!-- Summary Performa Teknisi Card -->
+          <div class="card performa-main-card">
+            <div class="card-header">
+              <div class="card-title">
+                <i data-lucide="trending-up"></i> Ringkasan Performa & Insentif
+              </div>
+            </div>
+
+            <div id="performa-content-container" class="performa-container">
+              <div class="empty-state-sm">
+                <i data-lucide="loader-2" class="spin-lg"></i>
+                <p>Memuat data Performa & Insentif...</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- TAB 4: NOTIFIKASI LONCENG (SHEET NOTIF COLS A1-JXXX) -->
+        <section id="tab-notif" class="tab-content">
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">
+                <i data-lucide="bell"></i> Notifikasi & Informasi Part
+                <span class="badge-count" id="notif-tech-count">0 Notif</span>
+              </div>
+            </div>
+
+            <div id="notif-list-container" class="notif-container">
+              <div class="empty-state-sm">
+                <i data-lucide="loader-2" class="spin-lg"></i>
+                <p>Memuat Notifikasi dari Google Sheet...</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- TAB 5: RIWAYAT / STATUS LOGS -->
         <section id="tab-history" class="tab-content">
           <div class="card">
             <div class="card-header">
@@ -184,7 +302,7 @@
           </div>
         </section>
 
-        <!-- TAB 3: DEDICATED HALAMAN PROFIL -->
+        <!-- TAB 6: DEDICATED HALAMAN PROFIL -->
         <section id="tab-profile" class="tab-content">
           
           <!-- Card Profil Header User -->
@@ -275,7 +393,7 @@
 
         </section>
 
-        <!-- TAB 4: KELOLA USER (KHUSUS ADMIN) -->
+        <!-- TAB 7: KELOLA USER (KHUSUS ADMIN) -->
         <section id="tab-users" class="tab-content">
           <div class="card">
             <div class="card-header">
@@ -299,21 +417,36 @@
 
       </main>
 
-      <!-- Bottom Navigation Bar -->
-      <nav class="app-nav">
-        <button class="nav-item active" data-target="tab-scan">
-          <i data-lucide="qr-code"></i>
-          <span>Scan Part</span>
+      <!-- Bottom Navigation Bar (Hidden on Main Menu Hub) -->
+      <nav class="app-nav hidden" id="app-nav">
+        <button class="nav-item active" data-target="tab-menu" data-mode="all" title="Kembali ke Menu Utama">
+          <i data-lucide="layout-grid"></i>
+          <span>Menu</span>
         </button>
-        <button class="nav-item" data-target="tab-history">
+        <button class="nav-item" data-target="tab-scan" data-mode="scan">
+          <i data-lucide="qr-code"></i>
+          <span>Scan</span>
+        </button>
+        <button class="nav-item" data-target="tab-history" data-mode="scan">
           <i data-lucide="history"></i>
           <span>Riwayat</span>
         </button>
-        <button class="nav-item" data-target="tab-profile">
+
+        <button class="nav-item" data-target="tab-pending" data-mode="teknisi">
+          <i data-lucide="clock"></i>
+          <span>Pending</span>
+          <span class="nav-badge hidden" id="nav-pending-badge">0</span>
+        </button>
+        <button class="nav-item" data-target="tab-performa" data-mode="teknisi">
+          <i data-lucide="trending-up"></i>
+          <span>Performa</span>
+        </button>
+
+        <button class="nav-item" data-target="tab-profile" data-mode="all">
           <i data-lucide="user-cog"></i>
           <span>Profil</span>
         </button>
-        <button class="nav-item admin-only hidden" id="nav-item-users" data-target="tab-users">
+        <button class="nav-item admin-only hidden" id="nav-item-users" data-target="tab-users" data-mode="all">
           <i data-lucide="users"></i>
           <span>User</span>
         </button>

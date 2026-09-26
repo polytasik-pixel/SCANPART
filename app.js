@@ -12,7 +12,8 @@ const STORAGE_KEYS = {
   HISTORY: 'teknisi_scan_history',
   SAVED_LOGIN: 'teknisi_saved_login',
   SESSION: 'teknisi_current_session',
-  THEME: 'teknisi_app_theme'
+  THEME: 'teknisi_app_theme',
+  SHEETS_CACHE: 'google_sheets_cache'
 };
 
 let state = {
@@ -42,7 +43,20 @@ let state = {
   isTorchOn: false,
   supabaseClient: null,
   realtimeChannel: null,
-  adminUsersChannel: null
+  adminUsersChannel: null,
+  // Google Sheets Data State
+  sheetsData: {
+    lastUpdateTimestamp: 'Memuat...',
+    lastSyncTime: null,
+    pendingCases: [],
+    insentifRows: [],
+    rata2Rows: [],
+    outputHariIni: [],
+    notifications: []
+  },
+  sheetsPollTimer: null,
+  isFetchingSheets: false,
+  pendingSearchQuery: ''
 };
 
 // ==========================================
@@ -65,15 +79,44 @@ const DOM = {
   btnDoLogin: document.getElementById('btn-do-login'),
   
   // App Navigation & Tabs
+  appNav: document.getElementById('app-nav'),
   navItems: document.querySelectorAll('.nav-item'),
   tabContents: document.querySelectorAll('.tab-content'),
   navItemUsers: document.getElementById('nav-item-users'),
   
-  // App Header
+  // App Header & Sheet Update Bar
   headerNama: document.getElementById('header-nama'),
   headerNik: document.getElementById('header-nik'),
   headerPswStatus: document.getElementById('header-psw-status'),
   headerPswText: document.getElementById('header-psw-text'),
+  headerNotifBtn: document.getElementById('header-notif-btn'),
+  headerBellBadge: document.getElementById('header-bell-badge'),
+  sheetUpdateBar: document.getElementById('sheet-update-bar'),
+  syncIcon: document.getElementById('sync-icon'),
+  sheetZ2Timestamp: document.getElementById('sheet-z2-timestamp'),
+  syncStatusBadge: document.getElementById('sync-status-badge'),
+  
+  // Menu Hub Mode Selector
+  btnSelectModeScan: document.getElementById('btn-select-mode-scan'),
+  btnSelectModeTeknisi: document.getElementById('btn-select-mode-teknisi'),
+
+  // Navigation Badges
+  navPendingBadge: document.getElementById('nav-pending-badge'),
+  navNotifBadge: document.getElementById('nav-notif-badge'),
+
+  // Sheets View Containers & Controls
+  btnRefreshPending: document.getElementById('btn-refresh-pending'),
+  inputSearchPending: document.getElementById('input-search-pending'),
+  btnClearSearchPending: document.getElementById('btn-clear-search-pending'),
+  pendingTechCount: document.getElementById('pending-tech-count'),
+  pendingListContainer: document.getElementById('pending-list-container'),
+  
+  btnRefreshPerforma: document.getElementById('btn-refresh-performa'),
+  performaContentContainer: document.getElementById('performa-content-container'),
+  
+  btnRefreshNotif: document.getElementById('btn-refresh-notif'),
+  notifTechCount: document.getElementById('notif-tech-count'),
+  notifListContainer: document.getElementById('notif-list-container'),
   
   // Dedicated Profile Display
   profDispNama: document.getElementById('prof-disp-nama'),
@@ -254,6 +297,7 @@ function showLoginScreen() {
   stopScanner();
   unsubscribeRealtime();
   unsubscribeAdminUsersRealtime();
+  stopSheetsPolling();
   if (state.globalQueuePollTimer) {
     clearInterval(state.globalQueuePollTimer);
     state.globalQueuePollTimer = null;
@@ -268,11 +312,15 @@ function showAppScreen() {
   DOM.screenLogin.classList.remove('active');
   DOM.screenApp.classList.add('active');
 
-  switchTab('tab-scan', false);
+  switchTab('tab-menu', false);
   updateUIFromState();
   subscribeRealtimeSettings();
   subscribeGlobalQueueRealtime();
   startScanner();
+  
+  // Google Sheets Single Source of Truth: load cache first, then start 10s auto poller
+  loadSheetsCache();
+  startSheetsPolling();
 }
 
 // Subscribe to Supabase Realtime changes for user settings
@@ -389,12 +437,63 @@ function setupEventListeners() {
   // Logout Button
   DOM.btnLogout.addEventListener('click', handleLogout);
 
-  // Navigation Tabs
+  // Mode Hub Cards Click Listeners
+  if (DOM.btnSelectModeScan) {
+    DOM.btnSelectModeScan.addEventListener('click', () => {
+      requestTabSwitch('tab-scan');
+    });
+  }
+  if (DOM.btnSelectModeTeknisi) {
+    DOM.btnSelectModeTeknisi.addEventListener('click', () => {
+      requestTabSwitch('tab-pending');
+    });
+  }
+
+  // Navigation Tabs & Header Bell
   DOM.navItems.forEach(item => {
     item.addEventListener('click', () => {
       requestTabSwitch(item.getAttribute('data-target'));
     });
   });
+
+  if (DOM.headerNotifBtn) {
+    DOM.headerNotifBtn.addEventListener('click', () => {
+      requestTabSwitch('tab-notif');
+    });
+  }
+
+  // Google Sheets Refresh & Search Listeners
+  if (DOM.sheetUpdateBar) {
+    DOM.sheetUpdateBar.style.cursor = 'pointer';
+    DOM.sheetUpdateBar.title = 'Klik untuk refresh data Google Sheet';
+    DOM.sheetUpdateBar.addEventListener('click', () => {
+      showToast('🔄 Memperbarui data dari Google Sheet...', 'info');
+      fetchGoogleSheetsData();
+    });
+  }
+
+  if (DOM.btnRefreshPending) DOM.btnRefreshPending.addEventListener('click', () => fetchGoogleSheetsData());
+  if (DOM.btnRefreshPerforma) DOM.btnRefreshPerforma.addEventListener('click', () => fetchGoogleSheetsData());
+  if (DOM.btnRefreshNotif) DOM.btnRefreshNotif.addEventListener('click', () => fetchGoogleSheetsData());
+
+  if (DOM.inputSearchPending) {
+    DOM.inputSearchPending.addEventListener('input', (e) => {
+      state.pendingSearchQuery = e.target.value;
+      if (DOM.btnClearSearchPending) {
+        DOM.btnClearSearchPending.style.display = e.target.value ? 'block' : 'none';
+      }
+      renderPendingTab();
+    });
+  }
+
+  if (DOM.btnClearSearchPending) {
+    DOM.btnClearSearchPending.addEventListener('click', () => {
+      state.pendingSearchQuery = '';
+      if (DOM.inputSearchPending) DOM.inputSearchPending.value = '';
+      DOM.btnClearSearchPending.style.display = 'none';
+      renderPendingTab();
+    });
+  }
 
   // Camera Scanner Buttons
   DOM.btnToggleCamera.addEventListener('click', toggleScanner);
@@ -850,6 +949,63 @@ function performClearHistory() {
   showToast('Riwayat berhasil dibersihkan', 'info');
 }
 
+function updateModeNavVisibility(targetTabId) {
+  // Determine active mode
+  if (targetTabId === 'tab-menu') {
+    state.currentMode = 'menu';
+  } else if (targetTabId === 'tab-scan' || targetTabId === 'tab-history') {
+    state.currentMode = 'scan';
+  } else if (targetTabId === 'tab-pending' || targetTabId === 'tab-performa' || targetTabId === 'tab-notif') {
+    state.currentMode = 'teknisi';
+  }
+
+  // 1. PSW Status Badge (PSW: ON/OFF)
+  // Hide on teknisi mode & menu mode, show only on scan mode or profile
+  if (DOM.headerPswStatus) {
+    DOM.headerPswStatus.classList.toggle('hidden', state.currentMode === 'teknisi' || state.currentMode === 'menu');
+  }
+
+  // 2. Header Bell Notification Button (#header-notif-btn)
+  // Show ONLY when in teknisi mode (Pending / Performa / Notif), hide in scan mode & menu hub!
+  if (DOM.headerNotifBtn) {
+    DOM.headerNotifBtn.classList.toggle('hidden', state.currentMode !== 'teknisi');
+  }
+
+  // 3. On tab-menu (Menu Utama Hub), hide bottom navbar & sheet update bar completely!
+  if (targetTabId === 'tab-menu') {
+    if (DOM.appNav) DOM.appNav.classList.add('hidden');
+    if (DOM.sheetUpdateBar) DOM.sheetUpdateBar.classList.add('hidden');
+    return;
+  }
+
+  // 4. On sub-pages, show bottom navbar
+  if (DOM.appNav) DOM.appNav.classList.remove('hidden');
+
+  // Show sheet update bar only when in teknisi mode
+  if (DOM.sheetUpdateBar) {
+    DOM.sheetUpdateBar.classList.toggle('hidden', state.currentMode !== 'teknisi');
+  }
+
+  // Filter individual navbar items according to active mode
+  DOM.navItems.forEach(item => {
+    const mode = item.getAttribute('data-mode');
+    const isTargetUserAdmin = item.id === 'nav-item-users';
+
+    if (isTargetUserAdmin && !state.isAdmin) {
+      item.classList.add('hidden');
+      return;
+    }
+
+    if (mode === 'all') {
+      item.classList.remove('hidden');
+    } else if (mode === state.currentMode) {
+      item.classList.remove('hidden');
+    } else {
+      item.classList.add('hidden');
+    }
+  });
+}
+
 function switchTab(targetTabId, pushState = true) {
   if (state.activeTab === targetTabId) return;
 
@@ -860,12 +1016,16 @@ function switchTab(targetTabId, pushState = true) {
   }
   state.activeTab = targetTabId;
 
+  updateModeNavVisibility(targetTabId);
+
   DOM.navItems.forEach(item => {
     item.classList.toggle('active', item.getAttribute('data-target') === targetTabId);
   });
   DOM.tabContents.forEach(content => {
     content.classList.toggle('active', content.id === targetTabId);
   });
+
+  lucide.createIcons();
 }
 
 function requestTabSwitch(targetTabId) {
@@ -1681,4 +1841,596 @@ async function performDeleteUser() {
     state.pendingDeleteUserId = null;
     state.pendingDeleteUserNik = null;
   }
+}
+
+// ==========================================
+// GOOGLE SHEETS LIVE DATA INTEGRATION & CACHE MODULE
+// ==========================================
+const GOOGLE_SHEET_ID = '1YhZ9aC-ypray0WwSZxY5dXNVraqLm-BNIuyWYNUkUQ0';
+
+function levenshteinDistance(a, b) {
+  if (a.length === 0) return b.length;
+  if (b.length === 0) return a.length;
+  const matrix = [];
+  for (let i = 0; i <= b.length; i++) matrix[i] = [i];
+  for (let j = 0; j <= a.length; j++) matrix[0][j] = j;
+
+  for (let i = 1; i <= b.length; i++) {
+    for (let j = 1; j <= a.length; j++) {
+      if (b.charAt(i - 1) === a.charAt(j - 1)) {
+        matrix[i][j] = matrix[i - 1][j - 1];
+      } else {
+        matrix[i][j] = Math.min(
+          matrix[i - 1][j - 1] + 1,
+          matrix[i][j - 1] + 1,
+          matrix[i - 1][j] + 1
+        );
+      }
+    }
+  }
+  return matrix[b.length][a.length];
+}
+
+function cleanNameString(str) {
+  if (!str) return '';
+  return String(str)
+    .toUpperCase()
+    .replace(/[\u00A0\u200B]/g, ' ')
+    .replace(/[^A-Z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function matchTechName(sheetName, userName, userNik = '') {
+  if (!sheetName) return false;
+
+  const sClean = cleanNameString(sheetName);
+  const uClean = cleanNameString(userName);
+  const nClean = cleanNameString(userNik);
+
+  if (!sClean) return false;
+
+  // 1. Direct match with NIK if available in sheet cell
+  if (nClean && nClean.length >= 3 && (sClean === nClean || sClean.includes(nClean))) {
+    return true;
+  }
+
+  if (!uClean) return false;
+
+  // 2. Direct equality or substring match
+  if (sClean === uClean || sClean.includes(uClean) || uClean.includes(sClean)) {
+    return true;
+  }
+
+  // 3. Token Word Match
+  const sWords = sClean.split(' ').filter(w => w.length > 0);
+  const uWords = uClean.split(' ').filter(w => w.length > 0);
+
+  if (sWords.length === 0 || uWords.length === 0) return false;
+
+  for (let uWord of uWords) {
+    if (uWord.length < 2) continue;
+    for (let sWord of sWords) {
+      if (sWord.length < 2) continue;
+
+      // Exact word match or inclusion
+      if (sWord === uWord || sWord.includes(uWord) || uWord.includes(sWord)) {
+        return true;
+      }
+
+      // Typo tolerance: allow 1 edit for 3-5 char words (e.g. REDI/REDY), 2 edits for >5 char words
+      const maxLen = Math.max(sWord.length, uWord.length);
+      if (Math.abs(sWord.length - uWord.length) <= 2) {
+        const dist = levenshteinDistance(sWord, uWord);
+        const maxAllowed = maxLen <= 5 ? 1 : 2;
+        if (dist <= maxAllowed) {
+          return true;
+        }
+      }
+    }
+  }
+
+  // 4. Full string similarity
+  const dist = levenshteinDistance(sClean, uClean);
+  const maxL = Math.max(sClean.length, uClean.length);
+  return ((maxL - dist) / maxL) >= 0.5;
+}
+
+function loadSheetsCache() {
+  const cached = localStorage.getItem(STORAGE_KEYS.SHEETS_CACHE);
+  if (cached) {
+    try {
+      const parsed = JSON.parse(cached);
+      state.sheetsData = {
+        ...state.sheetsData,
+        ...parsed
+      };
+      renderAllSheetsViews();
+    } catch (e) {
+      console.warn('Gagal parse cache Google Sheets:', e);
+    }
+  }
+}
+
+function saveSheetsCache() {
+  try {
+    localStorage.setItem(STORAGE_KEYS.SHEETS_CACHE, JSON.stringify(state.sheetsData));
+  } catch (e) {
+    console.warn('Gagal simpan cache Google Sheets:', e);
+  }
+}
+
+async function fetchGVizSheet(sheetName) {
+  // Use JSONP dynamic script injection to bypass CORS policy restrictions completely
+  try {
+    return await new Promise((resolve, reject) => {
+      const callbackName = 'gviz_cb_' + Math.floor(Math.random() * 1000000);
+      const timeout = setTimeout(() => {
+        if (window[callbackName]) delete window[callbackName];
+        const el = document.getElementById(callbackName);
+        if (el) el.remove();
+        reject(new Error(`Timeout fetching sheet ${sheetName}`));
+      }, 10000);
+
+      window[callbackName] = function(response) {
+        clearTimeout(timeout);
+        delete window[callbackName];
+        const el = document.getElementById(callbackName);
+        if (el) el.remove();
+        if (response && response.table) {
+          resolve(response.table);
+        } else {
+          reject(new Error(`Response table invalid for sheet ${sheetName}`));
+        }
+      };
+
+      const script = document.createElement('script');
+      script.id = callbackName;
+      script.src = `https://docs.google.com/spreadsheets/d/${GOOGLE_SHEET_ID}/gviz/tq?tqx=responseHandler:${callbackName}&sheet=${encodeURIComponent(sheetName)}&t=${Date.now()}`;
+      script.onerror = function(err) {
+        clearTimeout(timeout);
+        if (window[callbackName]) delete window[callbackName];
+        script.remove();
+        reject(err);
+      };
+      document.body.appendChild(script);
+    });
+  } catch (jsonpErr) {
+    // Fallback to fetch API if JSONP fails
+    const url = `https://docs.google.com/spreadsheets/d/${GOOGLE_SHEET_ID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(sheetName)}&t=${Date.now()}`;
+    const res = await fetch(url);
+    const text = await res.text();
+    const jsonMatch = text.match(/google\.visualization\.Query\.setResponse\(([\s\S]*)\);?/);
+    if (!jsonMatch) throw new Error(`Format respon Google Sheet ${sheetName} tidak valid`);
+    const parsed = JSON.parse(jsonMatch[1]);
+    return parsed.table;
+  }
+}
+
+function extractMatrixFromGViz(table) {
+  if (!table || !table.rows) return [];
+  return table.rows.map(row => {
+    if (!row || !row.c) return [];
+    return row.c.map(cell => {
+      if (!cell) return '';
+      if (cell.f !== undefined && cell.f !== null) return String(cell.f).trim();
+      if (cell.v !== undefined && cell.v !== null) return String(cell.v).trim();
+      return '';
+    });
+  });
+}
+
+async function fetchGoogleSheetsData() {
+  if (!state.isLoggedIn || state.isFetchingSheets) return;
+  state.isFetchingSheets = true;
+
+  if (DOM.syncIcon) DOM.syncIcon.classList.add('spinning');
+
+  try {
+    const [tableData, tableNotif] = await Promise.all([
+      fetchGVizSheet('DATA'),
+      fetchGVizSheet('NOTIF')
+    ]);
+
+    const rowsData = extractMatrixFromGViz(tableData);
+    const rowsNotif = extractMatrixFromGViz(tableNotif);
+
+    const techName = state.profile.nama || '';
+    const techNik = state.profile.nik || '';
+
+    // 1. Timestamp Z2 (Col index 25, Row index 1 = cell Z2)
+    let lastUpdateStr = '';
+    if (rowsData.length > 1 && rowsData[1][25]) {
+      lastUpdateStr = rowsData[1][25];
+    } else if (rowsData.length > 0 && rowsData[0][25]) {
+      lastUpdateStr = rowsData[0][25];
+    }
+    
+    if (!lastUpdateStr || lastUpdateStr.length < 3) {
+      const now = new Date();
+      lastUpdateStr = now.toLocaleDateString('id-ID') + ' ' + now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+    }
+
+    // 2. Pending Cases (Cols A-J, indices 0-9, Row 1+)
+    // Col 0: TGL, 1: NO SCL, 2: TYPE, 3: SERI, 4: LAYANAN, 5: STOK IN, 6: STATUS, 7: TEKNISI (COL H), 8: KET PART, 9: USIA
+    const pendingCases = [];
+    for (let r = 0; r < rowsData.length; r++) {
+      const row = rowsData[r];
+      if (!row || row.length === 0) continue;
+      const rowTech = row[7] || '';
+      if (rowTech && matchTechName(rowTech, techName, techNik)) {
+        pendingCases.push({
+          tgl: row[0] || '',
+          no_scl: row[1] || '',
+          type: row[2] || '',
+          seri: row[3] || '',
+          layanan: row[4] || '',
+          stok_in: row[5] || '',
+          status: row[6] || '',
+          teknisi: row[7] || '',
+          ket_part: row[8] || '',
+          usia: row[9] || ''
+        });
+      }
+    }
+
+    // 3. Insentif Rows (Cols K-V, indices 10-21, Row 1+)
+    // 10: NAMA (COL K), 11: NIK, 12: JOB, 13: MULTI, 14: INDOOR, 15: OUTDOOR, 16: AC, 17: EV1, 18: EV2, 19: EV3, 20: KONVERSI (COL U), 21: INSENTIF (COL V)
+    const insentifRows = [];
+    for (let r = 0; r < rowsData.length; r++) {
+      const row = rowsData[r];
+      if (!row || row.length === 0) continue;
+      const rowNama = row[10] || '';
+      if (rowNama && matchTechName(rowNama, techName, techNik)) {
+        insentifRows.push({
+          nama: row[10] || '',
+          nik: row[11] || '',
+          job: row[12] || '',
+          multi: row[13] || '',
+          indoor: row[14] || '0',
+          outdoor: row[15] || '0',
+          ac: row[16] || '0',
+          ev1: row[17] || '0',
+          ev2: row[18] || '0',
+          ev3: row[19] || '0',
+          konversi: row[20] || '0',
+          insentif: (row[21] && String(row[21]).trim() !== '' && String(row[21]).trim() !== '0') ? row[21] : (row[20] || '0')
+        });
+      }
+    }
+
+    // 4. Rata-Rata & Selisih Unit (Cols W-Y, indices 22-24, Row 1+)
+    // 22: NAMA (COL W), 23: RATA-RATA, 24: SELISIH UNIT
+    const rata2Rows = [];
+    for (let r = 0; r < rowsData.length; r++) {
+      const row = rowsData[r];
+      if (!row || row.length === 0) continue;
+      const rowNama = row[22] || '';
+      if (rowNama && matchTechName(rowNama, techName, techNik)) {
+        rata2Rows.push({
+          nama: row[22] || '',
+          rata_rata: row[23] || '0',
+          selisih_unit: row[24] || '0'
+        });
+      }
+    }
+
+    // 5. Output Hari Ini (Tabel K12-L20, row indices 10 to 19)
+    const outputHariIni = [];
+    for (let r = 10; r <= 19; r++) {
+      if (r < rowsData.length) {
+        const row = rowsData[r];
+        if (row && row.length > 10) {
+          const rowNama = row[10] || '';
+          const outputVal = row[11];
+          if (rowNama && outputVal !== undefined && outputVal !== null && String(outputVal).trim() !== '' && matchTechName(rowNama, techName, techNik)) {
+            outputHariIni.push({
+              nama: rowNama,
+              total_output: String(outputVal)
+            });
+          }
+        }
+      }
+    }
+
+    // 6. Notifications (Sheet NOTIF, Cols A-J, indices 0-9)
+    // 0: NO SCL, 1: TYPE, 2: SERI, 3: LAYANAN, 4: STOK IN, 5: STATUS, 6: TEKNISI, 7: KET PART, 8: USIA, 9: NOTES
+    const notifications = [];
+    for (let r = 0; r < rowsNotif.length; r++) {
+      const row = rowsNotif[r];
+      if (!row || row.length === 0) continue;
+      const rowTech = row[6] || row[7] || '';
+      if (rowTech && matchTechName(rowTech, techName, techNik)) {
+        notifications.push({
+          no_scl: row[0] || '',
+          type: row[1] || '',
+          seri: row[2] || '',
+          layanan: row[3] || '',
+          stok_in: row[4] || '',
+          status: row[5] || '',
+          teknisi: rowTech || '',
+          ket_part: row[7] || '',
+          usia: row[8] || '',
+          notes: row[9] || ''
+        });
+      }
+    }
+
+    // Update state & single source of truth cache
+    state.sheetsData = {
+      lastUpdateTimestamp: lastUpdateStr,
+      lastSyncTime: Date.now(),
+      pendingCases,
+      insentifRows,
+      rata2Rows,
+      outputHariIni,
+      notifications
+    };
+
+    saveSheetsCache();
+    renderAllSheetsViews();
+
+  } catch (err) {
+    console.warn('Polling Google Sheets gagal (menggunakan cache):', err);
+  } finally {
+    state.isFetchingSheets = false;
+    if (DOM.syncIcon) DOM.syncIcon.classList.remove('spinning');
+  }
+}
+
+function startSheetsPolling() {
+  stopSheetsPolling();
+  fetchGoogleSheetsData();
+  state.sheetsPollTimer = setInterval(fetchGoogleSheetsData, 10000);
+}
+
+function stopSheetsPolling() {
+  if (state.sheetsPollTimer) {
+    clearInterval(state.sheetsPollTimer);
+    state.sheetsPollTimer = null;
+  }
+}
+
+function renderAllSheetsViews() {
+  renderSheetUpdateInfo();
+  renderPendingTab();
+  renderPerformaTab();
+  renderNotifTab();
+  updateBadges();
+}
+
+function renderSheetUpdateInfo() {
+  if (DOM.sheetZ2Timestamp) {
+    DOM.sheetZ2Timestamp.textContent = state.sheetsData.lastUpdateTimestamp || 'Live (Google Sheet)';
+  }
+}
+
+function updateBadges() {
+  const notifCount = state.sheetsData.notifications ? state.sheetsData.notifications.length : 0;
+  const pendingCount = state.sheetsData.pendingCases ? state.sheetsData.pendingCases.length : 0;
+
+  if (DOM.headerBellBadge) {
+    DOM.headerBellBadge.textContent = notifCount;
+    DOM.headerBellBadge.classList.toggle('hidden', notifCount === 0);
+  }
+  if (DOM.navNotifBadge) {
+    DOM.navNotifBadge.textContent = notifCount;
+    DOM.navNotifBadge.classList.toggle('hidden', notifCount === 0);
+  }
+  if (DOM.navPendingBadge) {
+    DOM.navPendingBadge.textContent = pendingCount;
+    DOM.navPendingBadge.classList.toggle('hidden', pendingCount === 0);
+  }
+
+  if (DOM.pendingTechCount) DOM.pendingTechCount.textContent = `${pendingCount} Case`;
+  if (DOM.notifTechCount) DOM.notifTechCount.textContent = `${notifCount} Notif`;
+}
+
+function renderPendingTab() {
+  if (!DOM.pendingListContainer) return;
+  const cases = state.sheetsData.pendingCases || [];
+  const searchQ = (state.pendingSearchQuery || '').trim().toUpperCase();
+
+  const filtered = cases.filter(item => {
+    if (!searchQ) return true;
+    return (
+      (item.no_scl && item.no_scl.toUpperCase().includes(searchQ)) ||
+      (item.type && item.type.toUpperCase().includes(searchQ)) ||
+      (item.seri && item.seri.toUpperCase().includes(searchQ)) ||
+      (item.status && item.status.toUpperCase().includes(searchQ)) ||
+      (item.ket_part && item.ket_part.toUpperCase().includes(searchQ))
+    );
+  });
+
+  if (filtered.length === 0) {
+    DOM.pendingListContainer.innerHTML = `
+      <div class="empty-state-sm">
+        <i data-lucide="check-circle-2" class="text-success" style="width:32px;height:32px;"></i>
+        <p>${searchQ ? 'Tidak ada case pending yang cocok dengan pencarian.' : 'Tidak ada case pending untuk Anda saat ini.'}</p>
+      </div>`;
+    lucide.createIcons();
+    return;
+  }
+
+  DOM.pendingListContainer.innerHTML = filtered.map(item => {
+    const statusLower = (item.status || '').toLowerCase();
+    let statusClass = 'printed';
+    if (statusLower.includes('wip comp') || statusLower.includes('selesai')) statusClass = 'wip-comp';
+    else if (statusLower.includes('wip')) statusClass = 'wip';
+
+    return `
+      <div class="pending-card">
+        <div class="pending-card-header">
+          <div class="pending-scl">
+            <i data-lucide="file-text"></i> ${item.no_scl || '-'}
+          </div>
+        </div>
+        <div class="pending-info-grid">
+          <div class="pending-info-item">
+            <span>Tgl Case</span>
+            <strong>${item.tgl || '-'}</strong>
+          </div>
+          <div class="pending-info-item">
+            <span>Layanan</span>
+            <strong>${item.layanan || '-'}</strong>
+          </div>
+          <div class="pending-info-item">
+            <span>Type Unit</span>
+            <strong>${item.type || '-'}</strong>
+          </div>
+          <div class="pending-info-item">
+            <span>No Seri</span>
+            <strong>${item.seri || '-'}</strong>
+          </div>
+        </div>
+        ${item.ket_part ? `<div style="margin-top:4px;font-size:10px;"><span class="pending-part-desc">${item.ket_part}</span></div>` : ''}
+        <div class="pending-card-footer">
+          <span class="pending-status-badge ${statusClass}">${item.status || 'PENDING'}</span>
+          <span class="pending-age-badge">Usia: ${item.usia ? item.usia + ' Hari' : '-'}</span>
+        </div>
+      </div>`;
+  }).join('');
+
+  lucide.createIcons();
+}
+
+function formatRupiah(val) {
+  if (val === undefined || val === null || val === '') return 'Rp 0';
+  let str = String(val).trim();
+  if (!str || str === '0') return 'Rp 0';
+
+  if (/^rp/i.test(str)) {
+    return str.replace(/^rp\s*/i, 'Rp ');
+  }
+
+  if (/^\d{1,3}(\.\d{3})+$/.test(str)) {
+    return 'Rp ' + str;
+  }
+  if (/^\d{1,3}(\.\d{3})+,\d+$/.test(str)) {
+    return 'Rp ' + str;
+  }
+
+  let normalizedStr = str;
+  if (str.includes(',') && !str.includes('.')) {
+    normalizedStr = str.replace(',', '.');
+  } else if (str.includes('.') && str.includes(',')) {
+    normalizedStr = str.replace(/\./g, '').replace(',', '.');
+  }
+
+  let parsed = parseFloat(normalizedStr);
+  if (isNaN(parsed)) {
+    return 'Rp ' + str;
+  }
+
+  let formatted = parsed.toLocaleString('id-ID', {
+    maximumFractionDigits: 2
+  });
+
+  return 'Rp ' + formatted;
+}
+
+function renderPerformaTab() {
+  if (!DOM.performaContentContainer) return;
+  const insentif = state.sheetsData.insentifRows[0] || {};
+  const rata2 = state.sheetsData.rata2Rows[0] || {};
+  const outputObj = state.sheetsData.outputHariIni[0] || {};
+
+  DOM.performaContentContainer.innerHTML = `
+    <!-- Hero Performance Overview -->
+    <div class="performa-hero-card">
+      <div class="performa-hero-title">
+        <i data-lucide="user"></i> ${state.profile.nama || 'Teknisi'}
+      </div>
+      <div class="performa-hero-grid">
+        <div class="performa-hero-item">
+          <div class="performa-hero-value">${formatRupiah(insentif.insentif)}</div>
+          <div class="performa-hero-label">Point Insentif</div>
+        </div>
+        <div class="performa-hero-item">
+          <div class="performa-hero-value" style="color:var(--secondary);">${outputObj.total_output || '0'}</div>
+          <div class="performa-hero-label">Output Hari Ini</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Rating & Selisih Stats -->
+    <div class="performa-sub-title">
+      <i data-lucide="award"></i> Evaluasi & Rata-Rata Unit
+    </div>
+    <div class="performa-stat-grid">
+      <div class="performa-stat-box">
+        <div class="stat-val" style="color:var(--warning);">${rata2.rata_rata || '0.0'}</div>
+        <div class="stat-lbl">Rata-Rata</div>
+      </div>
+      <div class="performa-stat-box">
+        <div class="stat-val" style="color:var(--secondary);">${rata2.selisih_unit || '0'}</div>
+        <div class="stat-lbl">Selisih Unit</div>
+      </div>
+      <div class="performa-stat-box">
+        <div class="stat-val">${insentif.konversi || '0'}</div>
+        <div class="stat-lbl"># Konversi</div>
+      </div>
+    </div>
+
+    <!-- Category Detail Units Breakdown -->
+    <div class="performa-sub-title">
+      <i data-lucide="layers"></i> Rincian Pengerjaan Unit
+    </div>
+    <div class="performa-stat-grid">
+      <div class="performa-stat-box">
+        <div class="stat-val">${insentif.indoor || '0'}</div>
+        <div class="stat-lbl">Indoor</div>
+      </div>
+      <div class="performa-stat-box">
+        <div class="stat-val">${insentif.outdoor || '0'}</div>
+        <div class="stat-lbl">Outdoor</div>
+      </div>
+      <div class="performa-stat-box">
+        <div class="stat-val">${insentif.ac || '0'}</div>
+        <div class="stat-lbl">AC</div>
+      </div>
+      <div class="performa-stat-box">
+        <div class="stat-val">${insentif.ev1 || '0'}</div>
+        <div class="stat-lbl">EV 1</div>
+      </div>
+      <div class="performa-stat-box">
+        <div class="stat-val">${insentif.ev2 || '0'}</div>
+        <div class="stat-lbl">EV 2</div>
+      </div>
+      <div class="performa-stat-box">
+        <div class="stat-val">${insentif.ev3 || '0'}</div>
+        <div class="stat-lbl">EV 3</div>
+      </div>
+    </div>`;
+
+  lucide.createIcons();
+}
+
+function renderNotifTab() {
+  if (!DOM.notifListContainer) return;
+  const list = state.sheetsData.notifications || [];
+
+  if (list.length === 0) {
+    DOM.notifListContainer.innerHTML = `
+      <div class="empty-state-sm">
+        <i data-lucide="bell-off" style="width:32px;height:32px;color:var(--text-muted);"></i>
+        <p>Tidak ada notifikasi baru untuk Anda.</p>
+      </div>`;
+    lucide.createIcons();
+    return;
+  }
+
+  DOM.notifListContainer.innerHTML = list.map(item => `
+    <div class="notif-card">
+      <div class="notif-card-header">
+        <span class="notif-scl">${item.no_scl || 'INFORMASI'}</span>
+        <span class="notif-status">${item.status || 'INFO'}</span>
+      </div>
+      <div class="notif-detail">
+        <strong>${item.type || ''}</strong> ${item.seri ? ' - ' + item.seri : ''}
+      </div>
+      ${item.ket_part ? `<div style="font-size:10px;color:var(--warning);font-weight:600;"><i data-lucide="info" style="width:11px;height:11px;display:inline;"></i> ${item.ket_part}</div>` : ''}
+    </div>`).join('');
+
+  lucide.createIcons();
 }
