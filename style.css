@@ -1525,11 +1525,48 @@ input:checked + .slider:before { transform: translateX(20px); }
 /* ==========================================
    PENDING CASES STYLING (SHEET DATA A1-JXXX)
    ========================================== */
+#tab-pending.tab-content {
+  width: 100%;
+  flex: 1;
+  height: 100%;
+  min-height: 0;
+  box-sizing: border-box;
+}
+
+#tab-pending.tab-content.active {
+  display: flex;
+  flex-direction: column;
+}
+
+#tab-pending .card {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  flex: 1;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+}
+
 .pending-container {
   display: flex;
   flex-direction: column;
   gap: 8px;
   margin-top: 4px;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.pending-container .empty-state-sm {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 200px;
+  padding: 30px 10px;
 }
 
 .pending-card {
@@ -1640,35 +1677,46 @@ input:checked + .slider:before { transform: translateX(20px); }
 }
 
 /* ==========================================
-   PERFORMA & INSENTIF STYLING
+   PERFORMA & INSENTIF STYLING (ELASTIC NO-SCROLL FULL SCREEN)
    ========================================== */
-/* ==========================================
-   PERFORMA & INSENTIF STYLING
-   ========================================== */
-#tab-performa {
-  margin: -1mm;
-  width: calc(100% + 2mm);
+#tab-performa.tab-content {
+  width: 100%;
   flex: 1;
+  height: 100%;
+  min-height: 0;
   box-sizing: border-box;
+}
+
+#tab-performa.tab-content.active {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 #tab-performa .card,
 #tab-performa .card.performa-main-card {
-  border-radius: 0;
-  border-left: none;
-  border-right: none;
   width: 100%;
-  min-height: 100%;
-  box-shadow: none;
-  padding: 12px 10px;
+  height: 100%;
+  min-height: 0;
+  flex: 1;
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  overflow: hidden;
   box-sizing: border-box;
 }
 
 .performa-container {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  justify-content: space-between;
+  gap: 6px;
   width: 100%;
+  height: 100%;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
   box-sizing: border-box;
 }
 
@@ -1676,16 +1724,17 @@ input:checked + .slider:before { transform: translateX(20px); }
   background: linear-gradient(135deg, rgba(16, 185, 129, 0.15), rgba(99, 102, 241, 0.15));
   border: 1px solid var(--primary);
   border-radius: var(--radius-sm);
-  padding: 18px 14px;
+  padding: 8px 10px;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 6px;
   width: 100%;
+  flex: 0 0 auto;
   box-sizing: border-box;
 }
 
 .performa-hero-title {
-  font-size: 13.5px;
+  font-size: 11.5px;
   font-weight: 800;
   color: var(--text-muted);
   text-transform: uppercase;
@@ -1695,7 +1744,7 @@ input:checked + .slider:before { transform: translateX(20px); }
 .performa-hero-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 12px;
+  gap: 8px;
   width: 100%;
   box-sizing: border-box;
 }
@@ -1704,8 +1753,8 @@ input:checked + .slider:before { transform: translateX(20px); }
   background: var(--bg-card);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-sm);
-  padding: 28px 10px;
-  min-height: 135px;
+  padding: 8px 6px;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1716,7 +1765,7 @@ input:checked + .slider:before { transform: translateX(20px); }
 }
 
 .performa-hero-value {
-  font-size: 28px;
+  font-size: 20px;
   font-weight: 800;
   color: var(--primary);
   line-height: 1.1;
@@ -1724,28 +1773,31 @@ input:checked + .slider:before { transform: translateX(20px); }
 }
 
 .performa-hero-label {
-  font-size: 12.5px;
+  font-size: 10.5px;
   color: var(--text-muted);
-  margin-top: 8px;
+  margin-top: 3px;
   font-weight: 700;
 }
 
 .performa-sub-title {
-  font-size: 13.5px;
+  font-size: 11.5px;
   font-weight: 800;
   color: var(--text-main);
   display: flex;
   align-items: center;
   gap: 6px;
-  margin-top: 12px;
-  margin-bottom: 4px;
+  margin-top: 2px;
+  margin-bottom: 2px;
+  flex: 0 0 auto;
 }
 
 .performa-stat-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 12px;
+  gap: 6px;
   width: 100%;
+  flex: 1;
+  min-height: 0;
   box-sizing: border-box;
 }
 
@@ -1753,8 +1805,9 @@ input:checked + .slider:before { transform: translateX(20px); }
   background: var(--bg-input);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-sm);
-  padding: 20px 6px;
-  min-height: 90px;
+  padding: 6px 4px;
+  min-height: 0;
+  height: 100%;
   text-align: center;
   display: flex;
   flex-direction: column;
@@ -1765,16 +1818,16 @@ input:checked + .slider:before { transform: translateX(20px); }
 }
 
 .performa-stat-box .stat-val {
-  font-size: 20px;
+  font-size: 16px;
   font-weight: 800;
   color: var(--text-main);
   line-height: 1.2;
 }
 
 .performa-stat-box .stat-lbl {
-  font-size: 11.5px;
+  font-size: 10px;
   color: var(--text-muted);
-  margin-top: 6px;
+  margin-top: 2px;
   font-weight: 700;
 }
 
