@@ -2103,6 +2103,9 @@ async function fetchGoogleSheetsData() {
       if (!row || row.length === 0) continue;
       const rowNama = row[10] || '';
       if (rowNama && matchTechName(rowNama, techName, techNik)) {
+        const rawColV = (row[21] !== undefined && row[21] !== null) ? String(row[21]).trim() : '';
+        const insentifVal = (rawColV === '' || rawColV === '-' || rawColV === '0') ? 'Rp 0' : rawColV;
+
         insentifRows.push({
           nama: row[10] || '',
           nik: row[11] || '',
@@ -2115,7 +2118,7 @@ async function fetchGoogleSheetsData() {
           ev2: row[18] || '0',
           ev3: row[19] || '0',
           konversi: row[20] || '0',
-          insentif: (row[21] && String(row[21]).trim() !== '' && String(row[21]).trim() !== '0') ? row[21] : (row[20] || '0')
+          insentif: insentifVal
         });
       }
     }
@@ -2318,7 +2321,7 @@ function renderPendingTab() {
 function formatRupiah(val) {
   if (val === undefined || val === null || val === '') return 'Rp 0';
   let str = String(val).trim();
-  if (!str || str === '0') return 'Rp 0';
+  if (!str || str === '0' || str === '-') return 'Rp 0';
 
   if (/^rp/i.test(str)) {
     return str.replace(/^rp\s*/i, 'Rp ');
@@ -2339,8 +2342,8 @@ function formatRupiah(val) {
   }
 
   let parsed = parseFloat(normalizedStr);
-  if (isNaN(parsed)) {
-    return 'Rp ' + str;
+  if (isNaN(parsed) || parsed === 0) {
+    return 'Rp 0';
   }
 
   let formatted = parsed.toLocaleString('id-ID', {
@@ -2365,7 +2368,7 @@ function renderPerformaTab() {
       <div class="performa-hero-grid">
         <div class="performa-hero-item">
           <div class="performa-hero-value">${formatRupiah(insentif.insentif)}</div>
-          <div class="performa-hero-label">Point Insentif</div>
+          <div class="performa-hero-label">Insentif</div>
         </div>
         <div class="performa-hero-item">
           <div class="performa-hero-value" style="color:var(--secondary);">${outputObj.total_output || '0'}</div>
