@@ -1642,6 +1642,23 @@ input:checked + .slider:before { transform: translateX(20px); }
 /* ==========================================
    PERFORMA & INSENTIF STYLING
    ========================================== */
+#tab-performa {
+  margin: -1mm;
+  width: calc(100% + 2mm);
+  flex: 1;
+}
+
+#tab-performa .card,
+#tab-performa .card.performa-main-card {
+  border-radius: 0;
+  border-left: none;
+  border-right: none;
+  width: 100%;
+  min-height: 100%;
+  box-shadow: none;
+  padding: 12px 10px;
+}
+
 .performa-container {
   display: flex;
   flex-direction: column;
@@ -1800,8 +1817,8 @@ input:checked + .slider:before { transform: translateX(20px); }
   flex: 1;
   display: none;
   flex-direction: column;
-  justify-content: center;
-  overflow: hidden;
+  justify-content: flex-start;
+  overflow-y: auto;
 }
 
 #tab-menu.active {
@@ -1811,10 +1828,10 @@ input:checked + .slider:before { transform: translateX(20px); }
 .menu-hub-wrapper {
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  justify-content: flex-start;
   gap: 12px;
-  padding: 4px 2px;
-  height: 100%;
+  padding: 10px 4px;
+  height: auto;
 }
 
 .menu-hub-welcome {

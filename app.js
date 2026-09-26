@@ -312,6 +312,10 @@ function showAppScreen() {
   DOM.screenLogin.classList.remove('active');
   DOM.screenApp.classList.add('active');
 
+  try {
+    history.replaceState({ tab: 'tab-menu' }, '', '#tab-menu');
+  } catch (e) {}
+
   switchTab('tab-menu', false);
   updateUIFromState();
   subscribeRealtimeSettings();
@@ -544,16 +548,33 @@ function setupEventListeners() {
     // 1. Close active modals first if open
     if (DOM.modalUserForm && DOM.modalUserForm.classList.contains('active')) {
       closeUserModal();
+      try { history.pushState({ tab: state.activeTab }, '', '#' + state.activeTab); } catch (err) {}
       return;
     }
     if (DOM.modalConfirm && DOM.modalConfirm.classList.contains('active')) {
       closeSubmitConfirmModal();
+      try { history.pushState({ tab: state.activeTab }, '', '#' + state.activeTab); } catch (err) {}
       return;
     }
 
-    // 2. Tab Navigation: check if leaving tab-scan with draft items
-    const targetTab = (e.state && e.state.tab) ? e.state.tab : 'tab-scan';
-    requestTabSwitch(targetTab);
+    // 2. Determine target tab: default to 'tab-menu' if e.state is missing or empty
+    const targetTab = (e.state && e.state.tab) ? e.state.tab : 'tab-menu';
+
+    // 3. Tab Navigation: check if leaving tab-scan with draft items
+    if (state.activeTab === 'tab-scan' && state.draftList.length > 0 && targetTab !== 'tab-scan') {
+      try { history.pushState({ tab: 'tab-scan' }, '', '#tab-scan'); } catch (err) {}
+      state.modalAction = 'switchTabWarn';
+      state.pendingTargetTabId = targetTab;
+
+      DOM.modalConfirmTitle.innerHTML = `<i data-lucide="alert-triangle"></i> Konfirmasi Pindah Halaman`;
+      DOM.modalConfirmMsg.textContent = 'No gudang yg sudah di input akan hilang. Lanjutkan?';
+      DOM.modalConfirmOkText.textContent = 'Ya, Lanjutkan';
+      DOM.modalConfirm.classList.add('active');
+      lucide.createIcons();
+      return;
+    }
+
+    switchTab(targetTab, false);
   });
 
   // Intercept Keyboard Refresh Shortcuts (F5, Ctrl+R, Cmd+R) and show custom centered popup modal
