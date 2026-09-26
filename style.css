@@ -494,7 +494,89 @@ body {
 }
 
 .logout-wrapper {
-  margin-top: 6px;
+  margin-top: 4px;
+}
+
+/* ==========================================
+   DEDICATED PROFILE SCREEN (ELASTIC NO-SCROLL)
+   ========================================== */
+#tab-profile.tab-content {
+  width: 100%;
+  flex: 1;
+  height: 100%;
+  min-height: 0;
+  box-sizing: border-box;
+}
+
+#tab-profile.tab-content.active {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 6px;
+  overflow: hidden;
+}
+
+#tab-profile .profile-header-card {
+  padding: 8px 10px;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+#tab-profile .profile-avatar-lg {
+  width: 36px;
+  height: 36px;
+}
+
+#tab-profile .profile-avatar-lg i {
+  width: 18px;
+  height: 18px;
+}
+
+#tab-profile .profile-details-text h2 {
+  font-size: 13px;
+}
+
+#tab-profile .theme-card {
+  padding: 6px 10px;
+  flex: 0 0 auto;
+}
+
+#tab-profile .btn-theme-opt {
+  padding: 5px 8px;
+  font-size: 10.5px;
+}
+
+#tab-profile .card-profile-form {
+  padding: 8px 10px;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  overflow: hidden;
+}
+
+#tab-profile #form-profile {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 2px;
+}
+
+#tab-profile .form-group {
+  margin-bottom: 2px;
+  gap: 2px;
+}
+
+#tab-profile .switch-card {
+  padding: 4px 8px;
+  margin-bottom: 2px;
+}
+
+#tab-profile .logout-wrapper {
+  margin-top: 2px;
+  flex: 0 0 auto;
 }
 
 /* ==========================================
@@ -1710,8 +1792,7 @@ input:checked + .slider:before { transform: translateX(20px); }
 .performa-container {
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
-  gap: 6px;
+  gap: 8px;
   width: 100%;
   height: 100%;
   flex: 1;
@@ -1724,12 +1805,13 @@ input:checked + .slider:before { transform: translateX(20px); }
   background: linear-gradient(135deg, rgba(16, 185, 129, 0.15), rgba(99, 102, 241, 0.15));
   border: 1px solid var(--primary);
   border-radius: var(--radius-sm);
-  padding: 8px 10px;
+  padding: 10px 10px;
   display: flex;
   flex-direction: column;
   gap: 6px;
   width: 100%;
-  flex: 0 0 auto;
+  flex: 1;
+  min-height: 0;
   box-sizing: border-box;
 }
 
@@ -1739,6 +1821,7 @@ input:checked + .slider:before { transform: translateX(20px); }
   color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.5px;
+  flex: 0 0 auto;
 }
 
 .performa-hero-grid {
@@ -1746,6 +1829,8 @@ input:checked + .slider:before { transform: translateX(20px); }
   grid-template-columns: repeat(2, 1fr);
   gap: 8px;
   width: 100%;
+  flex: 1;
+  min-height: 0;
   box-sizing: border-box;
 }
 
@@ -1755,6 +1840,8 @@ input:checked + .slider:before { transform: translateX(20px); }
   border-radius: var(--radius-sm);
   padding: 8px 6px;
   min-height: 0;
+  height: 100%;
+  flex: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1762,10 +1849,11 @@ input:checked + .slider:before { transform: translateX(20px); }
   text-align: center;
   width: 100%;
   box-sizing: border-box;
+  container-type: size;
 }
 
 .performa-hero-value {
-  font-size: 20px;
+  font-size: clamp(18px, 3.6vh, 32px);
   font-weight: 800;
   color: var(--primary);
   line-height: 1.1;
@@ -1773,9 +1861,9 @@ input:checked + .slider:before { transform: translateX(20px); }
 }
 
 .performa-hero-label {
-  font-size: 10.5px;
+  font-size: clamp(10px, 1.8vh, 13.5px);
   color: var(--text-muted);
-  margin-top: 3px;
+  margin-top: 4px;
   font-weight: 700;
 }
 
@@ -1786,7 +1874,7 @@ input:checked + .slider:before { transform: translateX(20px); }
   display: flex;
   align-items: center;
   gap: 6px;
-  margin-top: 2px;
+  margin-top: 6px;
   margin-bottom: 2px;
   flex: 0 0 auto;
 }
@@ -1796,8 +1884,7 @@ input:checked + .slider:before { transform: translateX(20px); }
   grid-template-columns: repeat(3, 1fr);
   gap: 6px;
   width: 100%;
-  flex: 1;
-  min-height: 0;
+  flex: 0 0 auto;
   box-sizing: border-box;
 }
 
@@ -1805,9 +1892,10 @@ input:checked + .slider:before { transform: translateX(20px); }
   background: var(--bg-input);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-sm);
-  padding: 6px 4px;
-  min-height: 0;
-  height: 100%;
+  padding: 10px 4px;
+  min-height: 54px;
+  height: auto;
+  flex: 0 0 auto;
   text-align: center;
   display: flex;
   flex-direction: column;
@@ -1825,7 +1913,7 @@ input:checked + .slider:before { transform: translateX(20px); }
 }
 
 .performa-stat-box .stat-lbl {
-  font-size: 10px;
+  font-size: 10.5px;
   color: var(--text-muted);
   margin-top: 2px;
   font-weight: 700;
