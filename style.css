@@ -755,6 +755,16 @@ label i[data-lucide="filter"] {
   color-scheme: dark;
 }
 
+input[type="date"]::-webkit-datetime-edit-fields-wrapper,
+input[type="date"]::-webkit-datetime-edit,
+input[type="date"]::-webkit-datetime-edit-text,
+input[type="date"]::-webkit-datetime-edit-month-field,
+input[type="date"]::-webkit-datetime-edit-day-field,
+input[type="date"]::-webkit-datetime-edit-year-field {
+  opacity: 1 !important;
+  color: inherit !important;
+}
+
 .input-icon-wrapper input, .form-group input[type="text"], .form-group input[type="password"] {
   width: 100%;
   background-color: var(--bg-input);
