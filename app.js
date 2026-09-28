@@ -804,7 +804,7 @@ function setupEventListeners() {
   if (DOM.btnDismissMissingModal) DOM.btnDismissMissingModal.addEventListener('click', () => closeMissingModal());
   if (DOM.btnRefreshMissing) {
     DOM.btnRefreshMissing.addEventListener('click', () => {
-      showToast('🔄 Memperbarui data dari Google Sheet...', 'info');
+      showToast('🔄 Memperbarui data...', 'info');
       openMissingModal(false);
     });
   }
@@ -3137,7 +3137,7 @@ async function openMissingModal(isAutoRefresh = false) {
     DOM.missingFinishSummary.innerHTML = `
       <div style="text-align:center; padding:14px; color:var(--text-muted);">
         <i data-lucide="loader-2" class="spin-lg"></i>
-        <p style="margin-top:6px; font-size:12px; font-weight:600;">Memuat data terbaru dari Google Sheet...</p>
+        <p style="margin-top:6px; font-size:12px; font-weight:600;">Memuat data...</p>
       </div>`;
     lucide.createIcons();
   }
