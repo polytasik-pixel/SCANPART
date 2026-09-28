@@ -506,7 +506,6 @@ function subscribeAppSettingsRealtime() {
             if (state.showTransferStok !== newVal) {
               state.showTransferStok = newVal;
               applyTransferStokVisibilityUI();
-              showToast(`Pengaturan: Menu Transfer Stok ${newVal ? 'DITAMPILKAN' : 'DISEMBUNYIKAN'}`, 'info');
             }
           } else if (payload.new.setting_key === 'transfer_process_mode') {
             const newMode = payload.new.setting_value || 'STAFPART';
@@ -526,7 +525,6 @@ function subscribeAppSettingsRealtime() {
         if (state.showTransferStok !== newVal) {
           state.showTransferStok = newVal;
           applyTransferStokVisibilityUI();
-          showToast(`Pengaturan: Menu Transfer Stok ${newVal ? 'DITAMPILKAN' : 'DISEMBUNYIKAN'}`, 'info');
         }
       }
     })
@@ -693,7 +691,6 @@ function setupEventListeners() {
       const isChecked = e.target.checked;
       state.showTransferStok = isChecked;
       applyTransferStokVisibilityUI();
-      showToast(`Menu Transfer Stok ${isChecked ? 'DITAMPILKAN' : 'DISEMBUNYIKAN'} di semua perangkat`, 'info');
 
       if (state.supabaseClient) {
         try {
@@ -2079,7 +2076,7 @@ function escapeHtml(str) {
 // ==========================================
 // TOAST SYSTEM
 // ==========================================
-function showToast(message, type = 'info') {
+function showToast(message, type = 'info', duration = 600) {
   const toast = document.createElement('div');
   toast.className = `toast ${type}`;
 
@@ -2095,9 +2092,9 @@ function showToast(message, type = 'info') {
   setTimeout(() => {
     toast.style.opacity = '0';
     toast.style.transform = 'translateY(-6px)';
-    toast.style.transition = 'all 0.2s ease';
-    setTimeout(() => toast.remove(), 200);
-  }, 3000);
+    toast.style.transition = 'all 0.15s ease';
+    setTimeout(() => toast.remove(), 150);
+  }, duration);
 }
 
 // ==========================================
@@ -3164,6 +3161,14 @@ function cleanNameString(str) {
 }
 
 function matchTechName(sheetName, userName, userNik = '') {
+  const uUpper = (userName || '').toUpperCase().trim();
+  const nUpper = (userNik || '').toUpperCase().trim();
+
+  // If filter is empty ("") or user is admin (and not filtering for a specific technician name)
+  if (!uUpper && !nUpper) return true;
+  if (uUpper === 'ADMIN' || nUpper === 'ADMIN') return true;
+  if (state.isAdmin && (uUpper === (state.profile.nama || '').toUpperCase().trim() || uUpper === (state.profile.nik || '').toUpperCase().trim())) return true;
+
   if (!sheetName) return false;
 
   const sClean = cleanNameString(sheetName);
@@ -3244,51 +3249,46 @@ function saveSheetsCache() {
 
 async function fetchGVizSheet(sheetName, range = 'A1:Z1000', noHeaders = false) {
   // Use JSONP dynamic script injection to bypass CORS policy restrictions completely
-  try {
-    return await new Promise((resolve, reject) => {
-      const callbackName = 'gviz_cb_' + Math.floor(Math.random() * 1000000);
-      const timeout = setTimeout(() => {
-        if (window[callbackName]) delete window[callbackName];
-        const el = document.getElementById(callbackName);
-        if (el) el.remove();
-        reject(new Error(`Timeout fetching sheet ${sheetName}`));
-      }, 10000);
+  return new Promise((resolve, reject) => {
+    const callbackName = 'gviz_cb_' + Math.floor(Math.random() * 1000000);
 
-      window[callbackName] = function(response) {
-        clearTimeout(timeout);
-        delete window[callbackName];
-        const el = document.getElementById(callbackName);
-        if (el) el.remove();
-        if (response && response.table) {
-          resolve(response.table);
-        } else {
-          reject(new Error(`Response table invalid for sheet ${sheetName}`));
-        }
-      };
+    const cleanup = () => {
+      // Retain a dummy function so late responses do not throw Uncaught ReferenceError
+      window[callbackName] = function() {};
+      const el = document.getElementById(callbackName);
+      if (el) el.remove();
+      // Safely delete window[callbackName] after a 60-second grace period
+      setTimeout(() => {
+        try { delete window[callbackName]; } catch (e) {}
+      }, 60000);
+    };
 
-      const script = document.createElement('script');
-      script.id = callbackName;
-      const headersParam = noHeaders ? '&headers=0' : '';
-      script.src = `https://docs.google.com/spreadsheets/d/${GOOGLE_SHEET_ID}/gviz/tq?tqx=responseHandler:${callbackName}&sheet=${encodeURIComponent(sheetName)}&range=${encodeURIComponent(range)}${headersParam}&t=${Date.now()}`;
-      script.onerror = function(err) {
-        clearTimeout(timeout);
-        if (window[callbackName]) delete window[callbackName];
-        script.remove();
-        reject(err);
-      };
-      document.body.appendChild(script);
-    });
-  } catch (jsonpErr) {
-    // Fallback to fetch API if JSONP fails
+    const timeout = setTimeout(() => {
+      cleanup();
+      reject(new Error(`Timeout fetching sheet ${sheetName}`));
+    }, 25000);
+
+    window[callbackName] = function(response) {
+      clearTimeout(timeout);
+      cleanup();
+      if (response && response.table) {
+        resolve(response.table);
+      } else {
+        reject(new Error(`Response table invalid for sheet ${sheetName}`));
+      }
+    };
+
+    const script = document.createElement('script');
+    script.id = callbackName;
     const headersParam = noHeaders ? '&headers=0' : '';
-    const url = `https://docs.google.com/spreadsheets/d/${GOOGLE_SHEET_ID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(sheetName)}&range=${encodeURIComponent(range)}${headersParam}&t=${Date.now()}`;
-    const res = await fetch(url);
-    const text = await res.text();
-    const jsonMatch = text.match(/google\.visualization\.Query\.setResponse\(([\s\S]*)\);?/);
-    if (!jsonMatch) throw new Error(`Format respon Google Sheet ${sheetName} tidak valid`);
-    const parsed = JSON.parse(jsonMatch[1]);
-    return parsed.table;
-  }
+    script.src = `https://docs.google.com/spreadsheets/d/${GOOGLE_SHEET_ID}/gviz/tq?tqx=responseHandler:${callbackName}&sheet=${encodeURIComponent(sheetName)}&range=${encodeURIComponent(range)}${headersParam}&t=${Date.now()}`;
+    script.onerror = function(err) {
+      clearTimeout(timeout);
+      cleanup();
+      reject(new Error(`Script load error for sheet ${sheetName}`));
+    };
+    document.body.appendChild(script);
+  });
 }
 
 function extractMatrixFromGViz(table) {
@@ -3311,71 +3311,76 @@ async function fetchGoogleSheetsData() {
   if (DOM.syncIcon) DOM.syncIcon.classList.add('spinning');
 
   try {
-    const [tableData, tableNotif, tableZ2, tablePartKembali, tableAG, tableTagihan] = await Promise.all([
+    const [tableData, tableAcAl, tableNotif] = await Promise.all([
       fetchGVizSheet('DATA', 'A1:Z1000'),
-      fetchGVizSheet('NOTIF', 'A1:J1000'),
-      fetchGVizSheet('DATA', 'Z1:Z10', true),
-      fetchGVizSheet('DATA', 'AC1:AF1000', true),
-      fetchGVizSheet('DATA', 'AG1:AG10', true),
-      fetchGVizSheet('DATA', 'AI1:AL1000', true)
+      fetchGVizSheet('DATA', 'AC1:AL1000', true),
+      fetchGVizSheet('NOTIF', 'A1:J1000')
     ]);
 
     const rowsData = extractMatrixFromGViz(tableData);
+    const rowsAcAl = extractMatrixFromGViz(tableAcAl);
     const rowsNotif = extractMatrixFromGViz(tableNotif);
-    const rowsPartKembali = extractMatrixFromGViz(tablePartKembali);
-    const rowsTagihan = extractMatrixFromGViz(tableTagihan);
 
     const techName = state.profile.nama || '';
     const techNik = state.profile.nik || '';
 
-    // 1. Pending Timestamp (Cell Z2)
+    // 1. Timestamps
+    // 1a. Pending Timestamp (Cell Z2 / AG2 in sheet DATA)
     let pendingTimestamp = '';
-    if (tableZ2 && tableZ2.rows) {
-      for (let r = 0; r < tableZ2.rows.length; r++) {
-        const row = tableZ2.rows[r];
-        if (row && row.c && row.c[0]) {
-          const val = (row.c[0].v || row.c[0].f || '').toString().trim();
-          if (val && val.toUpperCase() !== 'KODE NOTIF' && val.length > 2) {
-            pendingTimestamp = val;
-            break;
+    if (rowsAcAl && rowsAcAl.length >= 2 && rowsAcAl[1].length > 4) {
+      const val = (rowsAcAl[1][4] || '').trim();
+      if (val && val.length > 2 && !val.toUpperCase().startsWith('PART') && !val.toUpperCase().startsWith('NO')) {
+        pendingTimestamp = val;
+      }
+    }
+    if ((!pendingTimestamp || pendingTimestamp.length < 3) && rowsData && rowsData.length >= 2) {
+      if (rowsData[1].length > 25 && rowsData[1][25]) {
+        pendingTimestamp = (rowsData[1][25] || '').trim();
+      }
+    }
+    if (!pendingTimestamp || pendingTimestamp.length < 3) {
+      if (tableData && tableData.rows) {
+        for (let r = 0; r < tableData.rows.length; r++) {
+          const row = tableData.rows[r];
+          if (row && row.c) {
+            for (let c = 0; c < row.c.length; c++) {
+              if (row.c[c]) {
+                const val = (row.c[c].v || row.c[c].f || '').toString().trim();
+                if (val && val.toUpperCase().startsWith('UPDATE DATA')) {
+                  pendingTimestamp = val;
+                  break;
+                }
+              }
+            }
+            if (pendingTimestamp) break;
           }
         }
       }
     }
     if (!pendingTimestamp || pendingTimestamp.length < 3) pendingTimestamp = 'Memuat data....';
 
-    // 1b. Performa Timestamp (Cell AG3 -> row index 2)
+    // 1b. Performa Timestamp (Cell AG3 -> row index 2, col index 4 of AC1:AL1000)
     let performaTimestamp = '';
-    if (tableAG && tableAG.rows && tableAG.rows.length >= 3) {
-      const row3 = tableAG.rows[2];
-      if (row3 && row3.c && row3.c[0]) {
-        performaTimestamp = (row3.c[0].v || row3.c[0].f || '').toString().trim();
-      }
+    if (rowsAcAl && rowsAcAl.length >= 3 && rowsAcAl[2].length > 4) {
+      performaTimestamp = (rowsAcAl[2][4] || '').trim();
     }
-    if (!performaTimestamp || performaTimestamp.length < 3) performaTimestamp = 'Memuat data....';
+    if (!performaTimestamp || performaTimestamp.length < 3) performaTimestamp = pendingTimestamp;
 
-    // 1c. Part Bekas Belum Kembali Timestamp (Cell AG5 -> row index 4)
+    // 1c. Part Bekas Belum Kembali Timestamp (Cell AG5 -> row index 4, col index 4 of AC1:AL1000)
     let partKembaliTimestamp = '';
-    if (tableAG && tableAG.rows && tableAG.rows.length >= 5) {
-      const row5 = tableAG.rows[4];
-      if (row5 && row5.c && row5.c[0]) {
-        partKembaliTimestamp = (row5.c[0].v || row5.c[0].f || '').toString().trim();
-      }
+    if (rowsAcAl && rowsAcAl.length >= 5 && rowsAcAl[4].length > 4) {
+      partKembaliTimestamp = (rowsAcAl[4][4] || '').trim();
     }
-    if (!partKembaliTimestamp || partKembaliTimestamp.length < 3) partKembaliTimestamp = 'Memuat data....';
+    if (!partKembaliTimestamp || partKembaliTimestamp.length < 3) partKembaliTimestamp = pendingTimestamp;
 
-    // 1d. Tagihan Timestamp (Cell AG6 -> row index 5)
+    // 1d. Tagihan Timestamp (Cell AG6 -> row index 5, col index 4 of AC1:AL1000)
     let tagihanTimestamp = '';
-    if (tableAG && tableAG.rows && tableAG.rows.length >= 6) {
-      const row6 = tableAG.rows[5];
-      if (row6 && row6.c && row6.c[0]) {
-        tagihanTimestamp = (row6.c[0].v || row6.c[0].f || '').toString().trim();
-      }
+    if (rowsAcAl && rowsAcAl.length >= 6 && rowsAcAl[5].length > 4) {
+      tagihanTimestamp = (rowsAcAl[5][4] || '').trim();
     }
-    if (!tagihanTimestamp || tagihanTimestamp.length < 3) tagihanTimestamp = 'Memuat data....';
+    if (!tagihanTimestamp || tagihanTimestamp.length < 3) tagihanTimestamp = pendingTimestamp;
 
     // 2. Pending Cases (Cols A-J, indices 0-9, Row 1+)
-    // Col 0: TGL, 1: NO SCL, 2: TYPE, 3: SERI, 4: LAYANAN, 5: STOK IN, 6: STATUS, 7: TEKNISI (COL H), 8: KET PART, 9: USIA
     const pendingCases = [];
     for (let r = 0; r < rowsData.length; r++) {
       const row = rowsData[r];
@@ -3398,7 +3403,6 @@ async function fetchGoogleSheetsData() {
     }
 
     // 3. Insentif Rows (Cols K-V, indices 10-21, Row 1+)
-    // 10: NAMA (COL K), 11: NIK, 12: JOB, 13: MULTI, 14: INDOOR, 15: OUTDOOR, 16: AC, 17: EV1, 18: EV2, 19: EV3, 20: KONVERSI (COL U), 21: INSENTIF (COL V)
     const insentifRows = [];
     for (let r = 0; r < rowsData.length; r++) {
       const row = rowsData[r];
@@ -3426,7 +3430,6 @@ async function fetchGoogleSheetsData() {
     }
 
     // 4. Rata-Rata & Selisih Unit (Cols W-Y, indices 22-24, Row 1+)
-    // 22: NAMA (COL W), 23: RATA-RATA, 24: SELISIH UNIT
     const rata2Rows = [];
     for (let r = 0; r < rowsData.length; r++) {
       const row = rowsData[r];
@@ -3460,7 +3463,6 @@ async function fetchGoogleSheetsData() {
     }
 
     // 6. Notifications (Sheet NOTIF, Cols A-J, indices 0-9)
-    // 0: NO SCL, 1: TYPE, 2: SERI, 3: LAYANAN, 4: STOK IN, 5: STATUS, 6: TEKNISI, 7: KET PART, 8: USIA, 9: NOTES
     const notifications = [];
     for (let r = 0; r < rowsNotif.length; r++) {
       const row = rowsNotif[r];
@@ -3482,10 +3484,10 @@ async function fetchGoogleSheetsData() {
       }
     }
 
-    // 7. Part Bekas (Sheet DATA, Range AC1:AF, 0: No Gudang, 1: Qty, 2: Nama Teknisi, 3: No Reservasi)
+    // 7. Part Bekas (Sheet DATA, Range AC-AF, indices 0-3 of rowsAcAl)
     const partBelumKembali = [];
-    for (let r = 0; r < rowsPartKembali.length; r++) {
-      const row = rowsPartKembali[r];
+    for (let r = 0; r < rowsAcAl.length; r++) {
+      const row = rowsAcAl[r];
       if (!row || row.length < 3) continue;
       const noGudang = (row[0] || '').trim();
       const qtyVal = (row[1] || '').trim();
@@ -3502,15 +3504,15 @@ async function fetchGoogleSheetsData() {
       }
     }
 
-    // 8. Tagihan Rows (Sheet DATA, Range AI1:AL1000, 0: NO INVOICE, 1: NAMA TEKNISI, 2: JUMLAH, 3: NAMA KONSUMEN)
+    // 8. Tagihan Rows (Sheet DATA, Range AI-AL, indices 6-9 of rowsAcAl)
     const tagihanRows = [];
-    for (let r = 0; r < rowsTagihan.length; r++) {
-      const row = rowsTagihan[r];
-      if (!row || row.length < 4) continue;
-      const noInvoice = (row[0] || '').trim();
-      const techNameRow = (row[1] || '').trim();
-      const jumlahVal = (row[2] || '').trim();
-      const namaKonsumen = (row[3] || '').trim();
+    for (let r = 0; r < rowsAcAl.length; r++) {
+      const row = rowsAcAl[r];
+      if (!row || row.length < 8) continue;
+      const noInvoice = (row[6] || '').trim();
+      const techNameRow = (row[7] || '').trim();
+      const jumlahVal = (row[8] || '').trim();
+      const namaKonsumen = (row[9] || '').trim();
 
       if (noInvoice && noInvoice.toUpperCase() !== 'NO INVOICE' && techNameRow && matchTechName(techNameRow, techName, techNik)) {
         tagihanRows.push({
