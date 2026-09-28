@@ -97,7 +97,7 @@
             <i data-lucide="shield-check"></i> <span id="header-psw-text">PSW: ON</span>
           </div>
           <button type="button" id="header-btn-missing" class="header-psw-badge hidden" style="background:var(--primary); border:1px solid rgba(255,255,255,0.4);" title="Cek tanggal laporan yang belum diisi">
-            <i data-lucide="calendar"></i> <span>LIHAT DATA</span>
+            <i data-lucide="calendar"></i> <span>Cek Tanggal Belum Isi</span>
           </button>
         </div>
       </header>
@@ -422,115 +422,163 @@
         </section>
 
         <!-- TAB: INPUT FINISH HARIAN TEKNISI (GOOGLE FORM REPLACEMENT) -->
+        <!-- TAB 5: FORM INPUT FINISH HARIAN & SEMUA DATA FINISH -->
         <section id="tab-finish" class="tab-content">
-          <div class="card card-finish-wrapper">
-            <div class="card-header">
-              <div class="card-title">
-                <i data-lucide="clipboard-check"></i> Form Input Finish Harian Teknisi
+          
+          <!-- SUB-PAGE 1: FORM INPUT FINISH HARIAN -->
+          <div id="finish-page-form" class="finish-page-content active">
+            <div class="card card-finish-wrapper">
+              <div class="card-header">
+                <div class="card-title">
+                  <i data-lucide="clipboard-check"></i> Form Input Finish Harian Teknisi
+                </div>
+              </div>
+
+              <form id="form-finish-harian" onsubmit="return false;" class="finish-form mt-2">
+                
+                <!-- Nama Teknisi -->
+                <div class="form-group">
+                  <label for="finish-nama">Nama Teknisi</label>
+                  <div class="input-icon-wrapper">
+                    <i data-lucide="user" class="input-icon"></i>
+                    <select id="finish-nama" class="custom-select" style="padding-left:36px; font-weight:700; color:var(--primary);"></select>
+                  </div>
+                </div>
+
+                <!-- Tanggal -->
+                <div class="form-group">
+                  <label for="finish-tgl">Tanggal Laporan</label>
+                  <div class="input-icon-wrapper">
+                    <i data-lucide="calendar" class="input-icon"></i>
+                    <input type="date" id="finish-tgl" class="custom-select" style="padding-left:36px;" required />
+                  </div>
+                </div>
+
+                <!-- Questions Grid -->
+                <div class="form-grid-2">
+                  <div class="form-group">
+                    <label for="finish-case-outdoor">Jumlah Case Ditugaskan (Outdoor)</label>
+                    <div class="input-icon-wrapper">
+                      <i data-lucide="sun" class="input-icon"></i>
+                      <input type="number" id="finish-case-outdoor" min="0" placeholder="0" />
+                    </div>
+                  </div>
+
+                  <div class="form-group">
+                    <label for="finish-finish-outdoor">Jumlah Case Finish Outdoor</label>
+                    <div class="input-icon-wrapper">
+                      <i data-lucide="check-circle" class="input-icon"></i>
+                      <input type="number" id="finish-finish-outdoor" min="0" placeholder="0" />
+                    </div>
+                  </div>
+
+                  <div class="form-group">
+                    <label for="finish-finish-indoor">Jumlah Case Finish Indoor</label>
+                    <div class="input-icon-wrapper">
+                      <i data-lucide="home" class="input-icon"></i>
+                      <input type="number" id="finish-finish-indoor" min="0" placeholder="0" />
+                    </div>
+                  </div>
+
+                  <div class="form-group">
+                    <label for="finish-wip-comp">Jumlah Case WIP COMP</label>
+                    <div class="input-icon-wrapper">
+                      <i data-lucide="clock" class="input-icon"></i>
+                      <input type="number" id="finish-wip-comp" min="0" placeholder="0" />
+                    </div>
+                  </div>
+
+                  <div class="form-group">
+                    <label for="finish-wip-tech">Jumlah Case WIP TECH (IN)</label>
+                    <div class="input-icon-wrapper">
+                      <i data-lucide="wrench" class="input-icon"></i>
+                      <input type="number" id="finish-wip-tech" min="0" placeholder="0" />
+                    </div>
+                  </div>
+
+                  <div class="form-group">
+                    <label for="finish-batal">Jumlah Case Batal</label>
+                    <div class="input-icon-wrapper">
+                      <i data-lucide="x-circle" class="input-icon"></i>
+                      <input type="number" id="finish-batal" min="0" placeholder="0" />
+                    </div>
+                  </div>
+
+                  <div class="form-group">
+                    <label for="finish-antar">Pengembalian (Antar)</label>
+                    <div class="input-icon-wrapper">
+                      <i data-lucide="truck" class="input-icon"></i>
+                      <input type="number" id="finish-antar" min="0" placeholder="0" />
+                    </div>
+                  </div>
+
+                  <div class="form-group">
+                    <label for="finish-no-visit">Tidak Terkunjungi</label>
+                    <div class="input-icon-wrapper">
+                      <i data-lucide="alert-circle" class="input-icon"></i>
+                      <input type="number" id="finish-no-visit" min="0" placeholder="0" />
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Keterangan Finish -->
+                <div class="form-group">
+                  <label for="finish-ket">Keterangan Finish</label>
+                  <div class="input-icon-wrapper">
+                    <i data-lucide="message-square" class="input-icon"></i>
+                    <input type="text" id="finish-ket" placeholder="Keterangan finish <4 ( >4 isi 0)..." />
+                  </div>
+                </div>
+
+                <button type="button" id="btn-submit-finish" class="btn btn-primary btn-block btn-sm mt-3">
+                  <i data-lucide="send"></i> KIRIM LAPORAN FINISH HARIAN
+                </button>
+              </form>
+            </div>
+          </div>
+
+          <!-- SUB-PAGE 2: SEMUA DATA (BULAN INI) -->
+          <div id="finish-page-all" class="finish-page-content" style="display:none; height:100%; flex:1; flex-direction:column; min-height:0; overflow:hidden;">
+            <div class="card" style="height:100%; flex:1; display:flex; flex-direction:column; min-height:0; overflow:hidden; padding:10px 10px 6px 10px;">
+              
+              <!-- Fixed Header & Search Card -->
+              <div class="finish-all-fixed-header" style="flex:0 0 auto; background:var(--bg-card); padding-bottom:6px; border-bottom:1px solid var(--border-color); margin-bottom:8px;">
+                <div class="card-header flex-between align-center" style="margin-bottom: 6px;">
+                  <div class="card-title" style="color:var(--primary); font-size:14px; font-weight:700; display:flex; align-items:center; gap:6px;">
+                    <i data-lucide="clipboard-list"></i> Semua Data Finish (Bulan Ini)
+                  </div>
+                  <button type="button" id="btn-refresh-finish-all" class="btn btn-ghost btn-xs" style="display:none; font-size:11px; font-weight:700; gap:4px; padding:4px 8px; border-radius:4px;" title="Refresh Data dari Google Sheet">
+                    <i data-lucide="refresh-cw" id="sync-icon-finish-all"></i> Refresh Data
+                  </button>
+                </div>
+
+                <!-- Filter Bar (Card Pencarian Paten - 1 Baris) -->
+                <div class="finish-filter-bar align-center mb-2" style="background:var(--card-bg-light); padding:6px 8px; border-radius:6px; border:1px solid var(--border-color); display:flex; gap:6px; align-items:center;">
+                  <input type="date" id="finish-all-filter-date" class="custom-select" style="font-size:11.5px; padding:4px 6px; height:32px; flex:1; min-width:0; border-radius:4px;" title="Filter berdasarkan Tanggal" />
+                  <div id="finish-all-tech-filter-wrapper" style="flex:1; min-width:0; display:none;">
+                    <input type="text" id="finish-all-filter-tech" placeholder="Cari nama teknisi..." class="custom-select" style="font-size:11.5px; padding:4px 8px; height:32px; width:100%; border-radius:4px;" autocomplete="off" />
+                  </div>
+                  <button type="button" id="btn-clear-finish-filter-date" class="btn btn-ghost btn-xs" style="display:none; width:32px; height:32px; min-width:32px; padding:0; flex-shrink:0; align-items:center; justify-content:center; border-radius:4px; color:var(--danger); border:1px solid var(--border-color);" title="Reset Filter">
+                    <i data-lucide="x" style="width:16px; height:16px;"></i>
+                  </button>
+                </div>
+
+                <!-- Summary Stats Box -->
+                <div id="finish-all-summary">
+                  <div style="text-align:center; padding:8px; color:var(--text-muted);">
+                    <i data-lucide="loader-2" class="spin-lg"></i>
+                    <p style="margin-top:4px; font-size:12px;">Memuat data laporan finish...</p>
+                  </div>
+                </div>
+              </div>
+
+              <!-- List Container (Only list items scroll) -->
+              <div id="finish-all-list" class="finish-all-list-container" style="flex:1; min-height:0; overflow-y:auto; display:flex; flex-direction:column; gap:8px; padding-right:2px;">
+                <!-- All data cards rendered here -->
               </div>
             </div>
-
-            <form id="form-finish-harian" onsubmit="return false;" class="finish-form mt-2">
-              
-              <!-- Nama Teknisi -->
-              <div class="form-group">
-                <label for="finish-nama">Nama Teknisi</label>
-                <div class="input-icon-wrapper">
-                  <i data-lucide="user" class="input-icon"></i>
-                  <select id="finish-nama" class="custom-select" style="padding-left:36px; font-weight:700; color:var(--primary);"></select>
-                </div>
-              </div>
-
-              <!-- Tanggal -->
-              <div class="form-group">
-                <label for="finish-tgl">Tanggal Laporan</label>
-                <div class="input-icon-wrapper">
-                  <i data-lucide="calendar" class="input-icon"></i>
-                  <input type="date" id="finish-tgl" class="custom-select" style="padding-left:36px;" required />
-                </div>
-              </div>
-
-              <!-- Questions Grid -->
-              <div class="form-grid-2">
-                <div class="form-group">
-                  <label for="finish-case-outdoor">Jumlah Case Ditugaskan (Outdoor)</label>
-                  <div class="input-icon-wrapper">
-                    <i data-lucide="sun" class="input-icon"></i>
-                    <input type="number" id="finish-case-outdoor" min="0" placeholder="0" />
-                  </div>
-                </div>
-
-                <div class="form-group">
-                  <label for="finish-finish-outdoor">Jumlah Case Finish Outdoor</label>
-                  <div class="input-icon-wrapper">
-                    <i data-lucide="check-circle" class="input-icon"></i>
-                    <input type="number" id="finish-finish-outdoor" min="0" placeholder="0" />
-                  </div>
-                </div>
-
-                <div class="form-group">
-                  <label for="finish-finish-indoor">Jumlah Case Finish Indoor</label>
-                  <div class="input-icon-wrapper">
-                    <i data-lucide="home" class="input-icon"></i>
-                    <input type="number" id="finish-finish-indoor" min="0" placeholder="0" />
-                  </div>
-                </div>
-
-                <div class="form-group">
-                  <label for="finish-wip-comp">Jumlah Case WIP COMP</label>
-                  <div class="input-icon-wrapper">
-                    <i data-lucide="clock" class="input-icon"></i>
-                    <input type="number" id="finish-wip-comp" min="0" placeholder="0" />
-                  </div>
-                </div>
-
-                <div class="form-group">
-                  <label for="finish-wip-tech">Jumlah Case WIP TECH (IN)</label>
-                  <div class="input-icon-wrapper">
-                    <i data-lucide="wrench" class="input-icon"></i>
-                    <input type="number" id="finish-wip-tech" min="0" placeholder="0" />
-                  </div>
-                </div>
-
-                <div class="form-group">
-                  <label for="finish-batal">Jumlah Case Batal</label>
-                  <div class="input-icon-wrapper">
-                    <i data-lucide="x-circle" class="input-icon"></i>
-                    <input type="number" id="finish-batal" min="0" placeholder="0" />
-                  </div>
-                </div>
-
-                <div class="form-group">
-                  <label for="finish-antar">Pengembalian (Antar)</label>
-                  <div class="input-icon-wrapper">
-                    <i data-lucide="truck" class="input-icon"></i>
-                    <input type="number" id="finish-antar" min="0" placeholder="0" />
-                  </div>
-                </div>
-
-                <div class="form-group">
-                  <label for="finish-no-visit">Tidak Terkunjungi</label>
-                  <div class="input-icon-wrapper">
-                    <i data-lucide="alert-circle" class="input-icon"></i>
-                    <input type="number" id="finish-no-visit" min="0" placeholder="0" />
-                  </div>
-                </div>
-              </div>
-
-              <!-- Keterangan Finish -->
-              <div class="form-group">
-                <label for="finish-ket">Keterangan Finish</label>
-                <div class="input-icon-wrapper">
-                  <i data-lucide="message-square" class="input-icon"></i>
-                  <input type="text" id="finish-ket" placeholder="Keterangan finish <4 ( >4 isi 0)..." />
-                </div>
-              </div>
-
-              <button type="button" id="btn-submit-finish" class="btn btn-primary btn-block btn-sm mt-3">
-                <i data-lucide="send"></i> KIRIM LAPORAN FINISH HARIAN
-              </button>
-            </form>
           </div>
+
         </section>
 
         <!-- TAB 6: DEDICATED HALAMAN PROFIL -->
@@ -772,8 +820,12 @@
           <span>TAGIHAN</span>
         </button>
         <button class="nav-item" data-target="tab-finish" data-mode="finish" title="Input Finish Harian">
-          <i data-lucide="clipboard-check"></i>
+          <i data-lucide="edit-3"></i>
           <span>Form</span>
+        </button>
+        <button class="nav-item" data-target="tab-finish-all" data-mode="finish" title="Semua Data Laporan Finish">
+          <i data-lucide="clipboard-list"></i>
+          <span>Semua Data</span>
         </button>
 
         <button class="nav-item" data-target="tab-pipo" data-mode="pipo">
@@ -844,6 +896,9 @@
       </div>
     </div>
 
+    <!-- ==========================================
+         MODAL LIHAT DATA MISSING FINISH HARIAN (PADDED MODAL 2MM)
+         ========================================== -->
     <!-- ==========================================
          MODAL LIHAT DATA MISSING FINISH HARIAN (PADDED MODAL 2MM)
          ========================================== -->

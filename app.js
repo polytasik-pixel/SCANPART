@@ -152,6 +152,18 @@ const DOM = {
   syncIconMissing: document.getElementById('sync-icon-missing'),
   missingFinishSummary: document.getElementById('missing-finish-summary'),
   missingFinishList: document.getElementById('missing-finish-list'),
+  btnFinishPageForm: document.getElementById('btn-finish-page-form'),
+  btnFinishPageAll: document.getElementById('btn-finish-page-all'),
+  finishPageForm: document.getElementById('finish-page-form'),
+  finishPageAll: document.getElementById('finish-page-all'),
+  btnRefreshFinishAll: document.getElementById('btn-refresh-finish-all'),
+  syncIconFinishAll: document.getElementById('sync-icon-finish-all'),
+  finishAllFilterDate: document.getElementById('finish-all-filter-date'),
+  btnClearFinishFilterDate: document.getElementById('btn-clear-finish-filter-date'),
+  finishAllFilterTech: document.getElementById('finish-all-filter-tech'),
+  finishAllTechFilterWrapper: document.getElementById('finish-all-tech-filter-wrapper'),
+  finishAllSummary: document.getElementById('finish-all-summary'),
+  finishAllList: document.getElementById('finish-all-list'),
 
   // Navigation Badges
   navPendingBadge: document.getElementById('nav-pending-badge'),
@@ -789,11 +801,72 @@ function setupEventListeners() {
   if (DOM.headerBtnMissing) DOM.headerBtnMissing.addEventListener('click', () => openMissingModal(false));
   if (DOM.btnOpenMissingModal) DOM.btnOpenMissingModal.addEventListener('click', () => openMissingModal(false));
   if (DOM.btnCloseMissingModal) DOM.btnCloseMissingModal.addEventListener('click', closeMissingModal);
-  if (DOM.btnDismissMissingModal) DOM.btnDismissMissingModal.addEventListener('click', closeMissingModal);
+  if (DOM.btnDismissMissingModal) DOM.btnDismissMissingModal.addEventListener('click', () => closeMissingModal());
   if (DOM.btnRefreshMissing) {
     DOM.btnRefreshMissing.addEventListener('click', () => {
       showToast('🔄 Memperbarui data dari Google Sheet...', 'info');
       openMissingModal(false);
+    });
+  }
+
+  if (DOM.btnFinishPageForm) {
+    DOM.btnFinishPageForm.addEventListener('click', () => {
+      if (DOM.btnFinishPageForm) DOM.btnFinishPageForm.classList.add('active');
+      if (DOM.btnFinishPageAll) DOM.btnFinishPageAll.classList.remove('active');
+      if (DOM.finishPageForm) DOM.finishPageForm.style.display = 'block';
+      if (DOM.finishPageAll) DOM.finishPageAll.style.display = 'none';
+    });
+  }
+
+  if (DOM.btnFinishPageAll) {
+    DOM.btnFinishPageAll.addEventListener('click', async () => {
+      if (DOM.btnFinishPageAll) DOM.btnFinishPageAll.classList.add('active');
+      if (DOM.btnFinishPageForm) DOM.btnFinishPageForm.classList.remove('active');
+      if (DOM.finishPageAll) DOM.finishPageAll.style.display = 'block';
+      if (DOM.finishPageForm) DOM.finishPageForm.style.display = 'none';
+      
+      if (DOM.syncIconFinishAll) DOM.syncIconFinishAll.classList.add('spinning');
+      try {
+        const { parsedAllRows } = await fetchFinishSheetData();
+        renderFinishAllDataTab(parsedAllRows);
+      } catch(e) {} finally {
+        if (DOM.syncIconFinishAll) DOM.syncIconFinishAll.classList.remove('spinning');
+      }
+    });
+  }
+
+  if (DOM.btnRefreshFinishAll) {
+    DOM.btnRefreshFinishAll.addEventListener('click', async () => {
+      if (DOM.syncIconFinishAll) DOM.syncIconFinishAll.classList.add('spinning');
+      showToast('🔄 Memperbarui data finish dari Google Sheet...', 'info');
+      try {
+        const { parsedAllRows } = await fetchFinishSheetData();
+        renderFinishAllDataTab(parsedAllRows);
+      } catch(e) {} finally {
+        if (DOM.syncIconFinishAll) DOM.syncIconFinishAll.classList.remove('spinning');
+      }
+    });
+  }
+
+  if (DOM.finishAllFilterDate) {
+    DOM.finishAllFilterDate.addEventListener('change', () => {
+      renderFinishAllDataTab();
+    });
+  }
+
+  if (DOM.btnClearFinishFilterDate) {
+    DOM.btnClearFinishFilterDate.addEventListener('click', () => {
+      if (DOM.finishAllFilterDate) DOM.finishAllFilterDate.value = '';
+      if (DOM.finishAllFilterTech) DOM.finishAllFilterTech.value = '';
+      renderFinishAllDataTab();
+    });
+  }
+
+  if (DOM.finishNama) {
+    DOM.finishNama.addEventListener('change', () => {
+      if (DOM.modalMissingFinish && DOM.modalMissingFinish.classList.contains('active')) {
+        openMissingModal(true);
+      }
     });
   }
 
@@ -1426,7 +1499,7 @@ function updateModeNavVisibility(targetTabId) {
     state.currentMode = 'teknisi';
   } else if (targetTabId === 'tab-pipo') {
     state.currentMode = 'pipo';
-  } else if (targetTabId === 'tab-finish') {
+  } else if (targetTabId === 'tab-finish' || targetTabId === 'tab-finish-all') {
     state.currentMode = 'finish';
   }
 
@@ -1437,7 +1510,7 @@ function updateModeNavVisibility(targetTabId) {
   }
 
   // 2. Header LIHAT DATA Button (#header-btn-missing)
-  // Show ONLY in finish mode (tab-finish), replacing the PSW badge in top right header!
+  // Show ONLY on Form Input Finish page (tab-finish). Hide on all other pages.
   if (DOM.headerBtnMissing) {
     DOM.headerBtnMissing.classList.toggle('hidden', targetTabId !== 'tab-finish');
   }
@@ -1498,8 +1571,10 @@ function switchTab(targetTabId, pushState = true) {
   DOM.navItems.forEach(item => {
     item.classList.toggle('active', item.getAttribute('data-target') === targetTabId);
   });
+
+  const activeSectionId = (targetTabId === 'tab-finish-all') ? 'tab-finish' : targetTabId;
   DOM.tabContents.forEach(content => {
-    content.classList.toggle('active', content.id === targetTabId);
+    content.classList.toggle('active', content.id === activeSectionId);
   });
 
   // Toggle Global Queue Modal visibility based on active tab (Show ONLY on Transfer Stok: tab-scan & tab-history)
@@ -1509,12 +1584,39 @@ function switchTab(targetTabId, pushState = true) {
     if (DOM.modalQueue) DOM.modalQueue.classList.remove('active');
   }
 
+  if (targetTabId !== 'tab-finish-all') {
+    if (DOM.finishAllFilterDate) DOM.finishAllFilterDate.value = '';
+    if (DOM.finishAllFilterTech) DOM.finishAllFilterTech.value = '';
+    if (DOM.btnClearFinishFilterDate) DOM.btnClearFinishFilterDate.style.display = 'none';
+  }
+
   if (targetTabId === 'tab-pipo') {
+    state.pipoSearchQuery = '';
+    state.pipoLimit = 40;
+    if (DOM.inputSearchPipo) DOM.inputSearchPipo.value = '';
+    if (DOM.btnClearSearchPipo) DOM.btnClearSearchPipo.style.display = 'none';
     renderPipoTab();
   }
-  if (targetTabId === 'tab-finish') {
+  if (targetTabId === 'tab-finish-all') {
+    if (DOM.btnFinishPageAll) DOM.btnFinishPageAll.classList.add('active');
+    if (DOM.btnFinishPageForm) DOM.btnFinishPageForm.classList.remove('active');
+    if (DOM.finishPageAll) DOM.finishPageAll.style.display = 'flex';
+    if (DOM.finishPageForm) DOM.finishPageForm.style.display = 'none';
+
+    if (DOM.syncIconFinishAll) DOM.syncIconFinishAll.classList.add('spinning');
+    fetchFinishSheetData().then(({ parsedAllRows }) => {
+      renderFinishAllDataTab(parsedAllRows);
+    }).catch(e => {}).finally(() => {
+      if (DOM.syncIconFinishAll) DOM.syncIconFinishAll.classList.remove('spinning');
+    });
+  } else if (targetTabId === 'tab-finish') {
     prepareFinishForm();
     renderFinishHistory();
+
+    if (DOM.btnFinishPageForm) DOM.btnFinishPageForm.classList.add('active');
+    if (DOM.btnFinishPageAll) DOM.btnFinishPageAll.classList.remove('active');
+    if (DOM.finishPageForm) DOM.finishPageForm.style.display = 'block';
+    if (DOM.finishPageAll) DOM.finishPageAll.style.display = 'none';
   }
 
   renderSheetUpdateInfo();
@@ -2842,9 +2944,9 @@ function normalizeDateString(str) {
 
 async function fetchFinishSheetData() {
   const filledDatesSet = new Set();
+  const parsedAllRows = [];
   const targetTechName = DOM.finishNama ? DOM.finishNama.value : (state.profile ? state.profile.nama : '');
 
-  // Fetch 100% real-time directly from Google Sheet: 1cFbwWRRxD6vj7XNFLzmxF_Mma9TP3qvsdMSEYIDg47M (Tab: Form Responses 1)
   const FINISH_SPREADSHEET_ID = '1cFbwWRRxD6vj7XNFLzmxF_Mma9TP3qvsdMSEYIDg47M';
 
   let rows = [];
@@ -2860,31 +2962,166 @@ async function fetchFinishSheetData() {
     }
   }
 
+  const now = new Date();
+  const currentYearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+
   if (rows && rows.length > 0) {
     for (let i = 0; i < rows.length; i++) {
       const row = rows[i];
       if (!row || row.length < 4) continue;
 
-      // Column C (index 2) is Nama Teknisi, Column D (index 3) is Tanggal Laporan
       const rowNama = String(row[2] || '').trim();
       const rowTglRaw = String(row[3] || '').trim();
 
       if (rowNama && rowTglRaw) {
         const normTgl = normalizeDateString(rowTglRaw);
         if (normTgl && /^\d{4}-\d{2}-\d{2}$/.test(normTgl)) {
-          if (targetTechName && matchTechName(rowNama, targetTechName)) {
-            filledDatesSet.add(normTgl);
+          // Check if record belongs to current month & year
+          if (normTgl.startsWith(currentYearMonth)) {
+            const entryObj = {
+              id: row[0] || i,
+              timestampCreated: String(row[1] || '').trim(),
+              nama: rowNama,
+              tglLaporan: normTgl,
+              tglRaw: rowTglRaw,
+              caseOutdoor: parseInt(row[4] || 0, 10) || 0,
+              finishOutdoor: parseInt(row[5] || 0, 10) || 0,
+              finishIndoor: parseInt(row[6] || 0, 10) || 0,
+              wipComp: parseInt(row[7] || 0, 10) || 0,
+              wipTech: parseInt(row[8] || 0, 10) || 0,
+              batal: parseInt(row[9] || 0, 10) || 0,
+              antar: parseInt(row[10] || 0, 10) || 0,
+              noVisit: parseInt(row[11] || 0, 10) || 0,
+              ket: String(row[12] || '').trim(),
+              bulan: String(row[13] || '').trim()
+            };
+
+            // Filter according to user role / logged in user
+            if (state.isAdmin || matchTechName(rowNama, targetTechName, state.profile ? state.profile.nik : '')) {
+              parsedAllRows.push(entryObj);
+            }
+
+            if (targetTechName && isSameTechnicianName(rowNama, targetTechName)) {
+              filledDatesSet.add(normTgl);
+            }
           }
         }
       }
     }
   }
 
-  return filledDatesSet;
+  // Sort parsedAllRows by tglLaporan descending
+  parsedAllRows.sort((a, b) => b.tglLaporan.localeCompare(a.tglLaporan));
+  state.finishParsedAllRows = parsedAllRows;
+
+  return { filledDatesSet, parsedAllRows };
+}
+
+function renderFinishAllDataTab(parsedRows = null) {
+  if (!DOM.finishPageAll) return;
+  const rows = parsedRows || state.finishParsedAllRows || [];
+
+  const dateFilter = DOM.finishAllFilterDate ? DOM.finishAllFilterDate.value : '';
+  const techFilter = DOM.finishAllFilterTech ? DOM.finishAllFilterTech.value.trim().toUpperCase() : '';
+
+  if (DOM.finishAllTechFilterWrapper) {
+    DOM.finishAllTechFilterWrapper.style.display = state.isAdmin ? 'flex' : 'none';
+  }
+
+  if (DOM.btnClearFinishFilterDate) {
+    DOM.btnClearFinishFilterDate.style.display = (dateFilter || techFilter) ? 'inline-flex' : 'none';
+  }
+
+  // Filter rows
+  const filtered = rows.filter(item => {
+    if (dateFilter && item.tglLaporan !== dateFilter) return false;
+    if (techFilter && !item.nama.toUpperCase().includes(techFilter)) return false;
+    return true;
+  });
+
+  let totalOutdoorFinish = 0;
+  let totalIndoorFinish = 0;
+  let totalWipComp = 0;
+  let totalWipTech = 0;
+  let totalBatal = 0;
+
+  filtered.forEach(r => {
+    totalOutdoorFinish += r.finishOutdoor;
+    totalIndoorFinish += r.finishIndoor;
+    totalWipComp += r.wipComp;
+    totalWipTech += r.wipTech;
+    totalBatal += r.batal;
+  });
+
+  const now = new Date();
+  const MONTHS_ID = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+  const monthLabel = `${MONTHS_ID[now.getMonth()]} ${now.getFullYear()}`;
+
+  if (DOM.finishAllSummary) {
+    DOM.finishAllSummary.innerHTML = `
+      <div style="background:var(--card-bg-light); border-left:3px solid var(--primary); padding:8px 10px; border-radius:6px; margin-bottom:8px;">
+        <div class="flex-between align-center">
+          <strong style="color:var(--text-color); font-size:12px;">📊 Total Laporan Bulan Ini (${monthLabel})</strong>
+          <span class="badge" style="background:var(--primary-light); color:var(--primary); font-size:11px; font-weight:700;">${filtered.length} Entry</span>
+        </div>
+        <div style="display:grid; grid-template-columns:repeat(5, 1fr); gap:4px; margin-top:6px; text-align:center; font-size:10px;">
+          <div style="background:var(--bg-input); padding:4px; border-radius:4px;"><span style="color:var(--text-muted); font-size:9px;">OUTDOOR</span><br/><strong style="color:var(--success);">${totalOutdoorFinish}</strong></div>
+          <div style="background:var(--bg-input); padding:4px; border-radius:4px;"><span style="color:var(--text-muted); font-size:9px;">INDOOR</span><br/><strong style="color:var(--primary);">${totalIndoorFinish}</strong></div>
+          <div style="background:var(--bg-input); padding:4px; border-radius:4px;"><span style="color:var(--text-muted); font-size:9px;">WIP COMP</span><br/><strong style="color:var(--warning);">${totalWipComp}</strong></div>
+          <div style="background:var(--bg-input); padding:4px; border-radius:4px;"><span style="color:var(--text-muted); font-size:9px;">WIP TECH</span><br/><strong style="color:var(--secondary);">${totalWipTech}</strong></div>
+          <div style="background:var(--bg-input); padding:4px; border-radius:4px;"><span style="color:var(--text-muted); font-size:9px;">BATAL</span><br/><strong style="color:var(--danger);">${totalBatal}</strong></div>
+        </div>
+      </div>`;
+  }
+
+  if (DOM.finishAllList) {
+    if (filtered.length === 0) {
+      DOM.finishAllList.innerHTML = `
+        <div style="text-align:center; padding:20px 10px; color:var(--text-muted);">
+          <i data-lucide="inbox" style="width:36px; height:36px; margin-bottom:6px;"></i>
+          <p style="font-weight:700; font-size:12px; margin:0;">Tidak Ada Data Laporan</p>
+          <span style="font-size:10.5px;">${dateFilter ? `Tidak ada laporan pada tanggal ${dateFilter}` : 'Belum ada laporan terdaftar untuk bulan ini.'}</span>
+        </div>`;
+    } else {
+      DOM.finishAllList.innerHTML = filtered.map(item => {
+        const parts = item.tglLaporan.split('-');
+        const dateObj = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+        const formattedDate = formatDateIndoFull(dateObj);
+
+        return `
+          <div class="finish-data-card">
+            <div class="finish-data-header">
+              <div class="finish-data-tgl">
+                <i data-lucide="calendar" style="width:14px; height:14px; color:var(--primary);"></i>
+                ${escapeHtml(formattedDate)}
+              </div>
+              <span class="finish-data-tech">${escapeHtml(item.nama)}</span>
+            </div>
+            <div class="finish-stats-grid">
+              <div class="finish-stat-box"><label>Outdoor (Fin/Tgs)</label><strong>${item.finishOutdoor} / ${item.caseOutdoor}</strong></div>
+              <div class="finish-stat-box"><label>Indoor Finish</label><strong style="color:var(--primary);">${item.finishIndoor}</strong></div>
+              <div class="finish-stat-box"><label>WIP COMP</label><strong style="color:var(--warning);">${item.wipComp}</strong></div>
+              <div class="finish-stat-box"><label>WIP TECH</label><strong style="color:var(--secondary);">${item.wipTech}</strong></div>
+              <div class="finish-stat-box"><label>Batal</label><strong style="color:var(--danger);">${item.batal}</strong></div>
+              <div class="finish-stat-box"><label>Antar / No Visit</label><strong>${item.antar} / ${item.noVisit}</strong></div>
+            </div>
+            ${item.ket ? `<div style="margin-top:6px; font-size:10.5px; color:var(--text-muted); background:var(--bg-input); padding:4px 8px; border-radius:4px;"><i data-lucide="message-square" style="width:11px; height:11px; vertical-align:middle; margin-right:3px;"></i>${escapeHtml(item.ket)}</div>` : ''}
+            ${item.timestampCreated ? `<div style="margin-top:4px; font-size:9.5px; color:var(--text-muted); text-align:right;">Input: ${escapeHtml(item.timestampCreated)}</div>` : ''}
+          </div>`;
+      }).join('');
+    }
+  }
+
+  lucide.createIcons();
 }
 
 async function openMissingModal(isAutoRefresh = false) {
   if (!DOM.modalMissingFinish) return;
+
+  // Automatically set active page to Form Input Finish
+  switchTab('tab-finish');
+  if (DOM.finishPageForm) DOM.finishPageForm.style.display = 'block';
+  if (DOM.finishPageAll) DOM.finishPageAll.style.display = 'none';
 
   DOM.modalMissingFinish.classList.add('active');
 
@@ -2906,8 +3143,9 @@ async function openMissingModal(isAutoRefresh = false) {
   }
 
   try {
-    const filledDatesSet = await fetchFinishSheetData();
+    const { filledDatesSet, parsedAllRows } = await fetchFinishSheetData();
     renderMissingDatesList(filledDatesSet);
+    renderFinishAllDataTab(parsedAllRows);
   } catch (err) {
     console.warn('Error openMissingModal:', err);
   } finally {
@@ -3012,6 +3250,11 @@ window.selectMissingDate = function(dateStr) {
     DOM.finishTgl.value = dateStr;
   }
   closeMissingModal();
+
+  switchTab('tab-finish');
+  if (DOM.finishPageForm) DOM.finishPageForm.style.display = 'block';
+  if (DOM.finishPageAll) DOM.finishPageAll.style.display = 'none';
+
   showToast(`📅 Tanggal ${dateStr} dipilih untuk diisi!`, 'info');
 };
 
@@ -3158,6 +3401,24 @@ function cleanNameString(str) {
     .replace(/[^A-Z0-9\s]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
+}
+
+function isSameTechnicianName(sheetNama, targetNama) {
+  if (!sheetNama || !targetNama) return false;
+  const sUpper = String(sheetNama).trim().toUpperCase();
+  const tUpper = String(targetNama).trim().toUpperCase();
+  if (!sUpper || !tUpper) return false;
+  if (sUpper === 'ADMIN' || tUpper === 'ADMIN') return false;
+  if (sUpper === tUpper) return true;
+  if (sUpper.includes(tUpper) || tUpper.includes(sUpper)) return true;
+  const sWords = cleanNameString(sheetNama).split(' ').filter(w => w.length >= 2);
+  const tWords = cleanNameString(targetNama).split(' ').filter(w => w.length >= 2);
+  for (let tw of tWords) {
+    for (let sw of sWords) {
+      if (sw === tw) return true;
+    }
+  }
+  return false;
 }
 
 function matchTechName(sheetName, userName, userNik = '') {
