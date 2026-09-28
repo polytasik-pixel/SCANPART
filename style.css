@@ -114,16 +114,20 @@ body {
   flex-direction: column;
   position: relative;
   overflow: hidden;
-  transition: background-color 0.25s ease;
+  transition: background-color 0.25s ease, max-width 0.25s ease, box-shadow 0.25s ease;
 }
 
-@media (min-width: 441px) {
+/* Tampilan PC / Desktop / Tablet (Layar Setengah di Tengah, Jarak 2mm Atas-Bawah dari Layar, Sudut 90-Derajat Soft 4px) */
+@media (min-width: 481px) {
   .app-container {
-    height: 100vh;
-    height: 100dvh;
-    max-width: 100%;
-    border-radius: 0;
-    border: none;
+    max-width: 480px;
+    height: calc(100vh - 4mm);
+    height: calc(100dvh - 4mm);
+    max-height: none;
+    border-radius: 4px;
+    border: 1px solid var(--border-dark);
+    box-shadow: 0 0 32px rgba(0, 0, 0, 0.5);
+    margin: 2mm auto;
   }
 }
 
@@ -498,80 +502,69 @@ body {
 }
 
 /* ==========================================
-   DEDICATED PROFILE SCREEN (ELASTIC NO-SCROLL)
+   DEDICATED PROFILE SCREEN (SCROLLABLE ON PC & MOBILE)
    ========================================== */
 #tab-profile.tab-content {
   width: 100%;
-  flex: 1;
-  height: 100%;
-  min-height: 0;
   box-sizing: border-box;
 }
 
 #tab-profile.tab-content.active {
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
-  gap: 6px;
-  overflow: hidden;
+  gap: 10px;
+  overflow-y: auto;
+  padding-bottom: 24px;
 }
 
 #tab-profile .profile-header-card {
-  padding: 8px 10px;
-  gap: 8px;
-  flex: 0 0 auto;
+  padding: 12px 14px;
+  gap: 12px;
 }
 
 #tab-profile .profile-avatar-lg {
-  width: 36px;
-  height: 36px;
+  width: 44px;
+  height: 44px;
 }
 
 #tab-profile .profile-avatar-lg i {
-  width: 18px;
-  height: 18px;
+  width: 22px;
+  height: 22px;
 }
 
 #tab-profile .profile-details-text h2 {
-  font-size: 13px;
+  font-size: 14px;
 }
 
 #tab-profile .theme-card {
-  padding: 6px 10px;
-  flex: 0 0 auto;
+  padding: 10px 12px;
 }
 
 #tab-profile .btn-theme-opt {
-  padding: 5px 8px;
-  font-size: 10.5px;
+  padding: 7px 10px;
+  font-size: 11px;
 }
 
 #tab-profile .card-profile-form {
-  padding: 8px 10px;
-  flex: 1;
-  min-height: 0;
+  padding: 12px 14px;
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
-  overflow: hidden;
+  gap: 8px;
 }
 
 #tab-profile #form-profile {
-  flex: 1;
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
-  gap: 2px;
+  gap: 8px;
 }
 
 #tab-profile .form-group {
-  margin-bottom: 2px;
-  gap: 2px;
+  margin-bottom: 6px;
 }
 
 #tab-profile .switch-card {
-  padding: 4px 8px;
-  margin-bottom: 2px;
+  padding: 8px 10px;
+  margin-bottom: 6px;
 }
 
 #tab-profile .logout-wrapper {
