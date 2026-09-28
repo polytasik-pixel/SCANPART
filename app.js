@@ -13,7 +13,10 @@ const STORAGE_KEYS = {
   SAVED_LOGIN: 'teknisi_saved_login',
   SESSION: 'teknisi_current_session',
   THEME: 'teknisi_app_theme',
-  SHEETS_CACHE: 'google_sheets_cache'
+  SHEETS_CACHE: 'google_sheets_cache',
+  PIPO_CACHE: 'pipo_sheets_cache',
+  FINISH_HISTORY: 'teknisi_finish_history',
+  FINISH_SHEET_CACHE: 'finish_sheet_cache'
 };
 
 let state = {
@@ -31,6 +34,7 @@ let state = {
   },
   draftList: [],
   history: [],
+  finishHistory: [],
   adminUsers: [],
   pendingDeleteDraftItemId: null,
   pendingDeleteUserId: null,
@@ -44,6 +48,9 @@ let state = {
   supabaseClient: null,
   realtimeChannel: null,
   adminUsersChannel: null,
+  appSettingsChannel: null,
+  showTransferStok: false,
+  transferProcessMode: 'STAFPART', // 'STAFPART' | 'HODS'
   // Google Sheets Data State
   sheetsData: {
     lastUpdateTimestamp: 'Memuat...',
@@ -56,7 +63,12 @@ let state = {
   },
   sheetsPollTimer: null,
   isFetchingSheets: false,
-  pendingSearchQuery: ''
+  pendingSearchQuery: '',
+  // PIPO Part Pengganti State
+  pipoData: [],
+  isFetchingPipo: false,
+  pipoSearchQuery: '',
+  pipoLimit: 40
 };
 
 // ==========================================
@@ -89,6 +101,7 @@ const DOM = {
   headerNik: document.getElementById('header-nik'),
   headerPswStatus: document.getElementById('header-psw-status'),
   headerPswText: document.getElementById('header-psw-text'),
+  headerBtnMissing: document.getElementById('header-btn-missing'),
   headerNotifBtn: document.getElementById('header-notif-btn'),
   headerBellBadge: document.getElementById('header-bell-badge'),
   sheetUpdateBar: document.getElementById('sheet-update-bar'),
@@ -99,6 +112,38 @@ const DOM = {
   // Menu Hub Mode Selector
   btnSelectModeScan: document.getElementById('btn-select-mode-scan'),
   btnSelectModeTeknisi: document.getElementById('btn-select-mode-teknisi'),
+  btnSelectModePipo: document.getElementById('btn-select-mode-pipo'),
+  btnSelectModeFinish: document.getElementById('btn-select-mode-finish'),
+
+  // Part Pengganti (PIPO) Controls
+  inputSearchPipo: document.getElementById('input-search-pipo'),
+  btnClearSearchPipo: document.getElementById('btn-clear-search-pipo'),
+  pipoCount: document.getElementById('pipo-count'),
+  pipoListContainer: document.getElementById('pipo-list-container'),
+
+  // Finish Harian Controls (Google Form Fields)
+  formFinishHarian: document.getElementById('form-finish-harian'),
+  finishNama: document.getElementById('finish-nama'),
+  finishTgl: document.getElementById('finish-tgl'),
+  finishCaseOutdoor: document.getElementById('finish-case-outdoor'),
+  finishFinishOutdoor: document.getElementById('finish-finish-outdoor'),
+  finishFinishIndoor: document.getElementById('finish-finish-indoor'),
+  finishWipComp: document.getElementById('finish-wip-comp'),
+  finishWipTech: document.getElementById('finish-wip-tech'),
+  finishBatal: document.getElementById('finish-batal'),
+  finishAntar: document.getElementById('finish-antar'),
+  finishNoVisit: document.getElementById('finish-no-visit'),
+  finishKet: document.getElementById('finish-ket'),
+  btnSubmitFinish: document.getElementById('btn-submit-finish'),
+  finishHistoryList: document.getElementById('finish-history-list'),
+  btnOpenMissingModal: document.getElementById('btn-open-missing-modal'),
+  modalMissingFinish: document.getElementById('modal-missing-finish'),
+  btnCloseMissingModal: document.getElementById('btn-close-missing-modal'),
+  btnDismissMissingModal: document.getElementById('btn-dismiss-missing-modal'),
+  btnRefreshMissing: document.getElementById('btn-refresh-missing'),
+  syncIconMissing: document.getElementById('sync-icon-missing'),
+  missingFinishSummary: document.getElementById('missing-finish-summary'),
+  missingFinishList: document.getElementById('missing-finish-list'),
 
   // Navigation Badges
   navPendingBadge: document.getElementById('nav-pending-badge'),
@@ -157,6 +202,7 @@ const DOM = {
   modalQueue: document.getElementById('modal-queue'),
   modalQueueMsg: document.getElementById('modal-queue-msg'),
   queueStatusText: document.getElementById('queue-status-text'),
+  btnQueueBackMenu: document.getElementById('btn-queue-back-menu'),
   
   // Profile Form
   profileNama: document.getElementById('profile-nama'),
@@ -171,7 +217,12 @@ const DOM = {
   historyList: document.getElementById('history-list'),
   btnClearHistory: document.getElementById('btn-clear-history'),
 
-  // Admin User Management
+  // Admin User Management & App Settings
+  adminTransferStokToggle: document.getElementById('admin-transfer-stok-toggle'),
+  adminProcessModeContainer: document.getElementById('admin-process-mode-container'),
+  adminProcessModeToggle: document.getElementById('admin-process-mode-toggle'),
+  adminProcessModeLabel: document.getElementById('admin-process-mode-label'),
+  adminProcessModeDesc: document.getElementById('admin-process-mode-desc'),
   adminUserCount: document.getElementById('admin-user-count'),
   btnOpenAddUser: document.getElementById('btn-open-add-user'),
   adminUsersList: document.getElementById('admin-users-list'),
@@ -229,6 +280,11 @@ function loadStoredData() {
   const storedHistory = localStorage.getItem(STORAGE_KEYS.HISTORY);
   if (storedHistory) {
     try { state.history = JSON.parse(storedHistory); } catch (e) {}
+  }
+  // Load Finish Harian History
+  const storedFinishHistory = localStorage.getItem(STORAGE_KEYS.FINISH_HISTORY);
+  if (storedFinishHistory) {
+    try { state.finishHistory = JSON.parse(storedFinishHistory); } catch (e) {}
   }
 }
 
@@ -297,6 +353,7 @@ function showLoginScreen() {
   stopScanner();
   unsubscribeRealtime();
   unsubscribeAdminUsersRealtime();
+  unsubscribeAppSettingsRealtime();
   stopSheetsPolling();
   if (state.globalQueuePollTimer) {
     clearInterval(state.globalQueuePollTimer);
@@ -314,17 +371,22 @@ function showAppScreen() {
 
   try {
     history.replaceState({ tab: 'tab-menu' }, '', '#tab-menu');
+    history.pushState({ tab: 'tab-menu' }, '', '#tab-menu');
   } catch (e) {}
 
   switchTab('tab-menu', false);
   updateUIFromState();
   subscribeRealtimeSettings();
   subscribeGlobalQueueRealtime();
+  fetchAppSettings();
+  subscribeAppSettingsRealtime();
   startScanner();
   
-  // Google Sheets Single Source of Truth: load cache first, then start 10s auto poller
+  // Load PIPO Cache & Start Data Polling / Fetching
   loadSheetsCache();
   startSheetsPolling();
+  loadPipoCache();
+  fetchPipoData();
 }
 
 // Subscribe to Supabase Realtime changes for user settings
@@ -358,6 +420,155 @@ function unsubscribeRealtime() {
   if (state.realtimeChannel && state.supabaseClient) {
     state.supabaseClient.removeChannel(state.realtimeChannel);
     state.realtimeChannel = null;
+  }
+}
+
+// ==========================================
+// REALTIME APP SETTINGS (SHOW / HIDE TRANSFER STOK MENU & PROCESS MODE)
+// ==========================================
+async function fetchAppSettings() {
+  if (!state.supabaseClient) return;
+
+  try {
+    const { data, error } = await state.supabaseClient
+      .from('app_settings')
+      .select('*')
+      .in('setting_key', ['show_transfer_stok', 'transfer_process_mode']);
+
+    if (error) {
+      console.warn('Error fetch app_settings:', error);
+      return;
+    }
+
+    if (data && data.length > 0) {
+      const stokSetting = data.find(s => s.setting_key === 'show_transfer_stok');
+      if (stokSetting) {
+        state.showTransferStok = (stokSetting.setting_value === 'true' || stokSetting.setting_value === true);
+      }
+      const modeSetting = data.find(s => s.setting_key === 'transfer_process_mode');
+      if (modeSetting) {
+        state.transferProcessMode = modeSetting.setting_value || 'STAFPART';
+      }
+    } else {
+      await state.supabaseClient
+        .from('app_settings')
+        .upsert([
+          { setting_key: 'show_transfer_stok', setting_value: 'true', updated_at: new Date().toISOString() },
+          { setting_key: 'transfer_process_mode', setting_value: 'STAFPART', updated_at: new Date().toISOString() }
+        ]);
+      state.showTransferStok = true;
+      state.transferProcessMode = 'STAFPART';
+    }
+    applyTransferStokVisibilityUI();
+  } catch (err) {
+    console.warn('Gagal memuat app_settings dari Supabase:', err);
+  }
+}
+
+function subscribeAppSettingsRealtime() {
+  if (!state.supabaseClient) return;
+
+  unsubscribeAppSettingsRealtime();
+
+  state.appSettingsChannel = state.supabaseClient
+    .channel('global_app_settings')
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'app_settings' },
+      (payload) => {
+        console.log('Realtime App Settings Postgres Change:', payload);
+        if (payload.new) {
+          if (payload.new.setting_key === 'show_transfer_stok') {
+            const newVal = (payload.new.setting_value === 'true' || payload.new.setting_value === true);
+            if (state.showTransferStok !== newVal) {
+              state.showTransferStok = newVal;
+              applyTransferStokVisibilityUI();
+              showToast(`Pengaturan: Menu Transfer Stok ${newVal ? 'DITAMPILKAN' : 'DISEMBUNYIKAN'}`, 'info');
+            }
+          } else if (payload.new.setting_key === 'transfer_process_mode') {
+            const newMode = payload.new.setting_value || 'STAFPART';
+            if (state.transferProcessMode !== newMode) {
+              state.transferProcessMode = newMode;
+              applyTransferStokVisibilityUI();
+              showToast(`Pengaturan: Mode Proses Transfer beralih ke ${newMode}`, 'info');
+            }
+          }
+        }
+      }
+    )
+    .on('broadcast', { event: 'toggle_transfer_stok' }, (data) => {
+      console.log('Realtime Broadcast App Settings (stok):', data);
+      if (data && data.payload && typeof data.payload.enabled === 'boolean') {
+        const newVal = data.payload.enabled;
+        if (state.showTransferStok !== newVal) {
+          state.showTransferStok = newVal;
+          applyTransferStokVisibilityUI();
+          showToast(`Pengaturan: Menu Transfer Stok ${newVal ? 'DITAMPILKAN' : 'DISEMBUNYIKAN'}`, 'info');
+        }
+      }
+    })
+    .on('broadcast', { event: 'toggle_process_mode' }, (data) => {
+      console.log('Realtime Broadcast App Settings (mode):', data);
+      if (data && data.payload && data.payload.mode) {
+        const newMode = data.payload.mode;
+        if (state.transferProcessMode !== newMode) {
+          state.transferProcessMode = newMode;
+          applyTransferStokVisibilityUI();
+          showToast(`Pengaturan: Mode Proses Transfer beralih ke ${newMode}`, 'info');
+        }
+      }
+    })
+    .subscribe((status) => {
+      console.log('Status Langganan Realtime App Settings:', status);
+    });
+}
+
+function unsubscribeAppSettingsRealtime() {
+  if (state.appSettingsChannel && state.supabaseClient) {
+    state.supabaseClient.removeChannel(state.appSettingsChannel);
+    state.appSettingsChannel = null;
+  }
+}
+
+function applyTransferStokVisibilityUI() {
+  if (DOM.adminTransferStokToggle) {
+    DOM.adminTransferStokToggle.checked = state.showTransferStok;
+  }
+
+  // Toggle card in main menu hub
+  if (DOM.btnSelectModeScan) {
+    DOM.btnSelectModeScan.style.display = state.showTransferStok ? '' : 'none';
+  }
+
+  // Toggle bottom navigation items for scan mode (Scan & Riwayat)
+  const scanNavItems = document.querySelectorAll('.nav-item[data-mode="scan"]');
+  scanNavItems.forEach(item => {
+    item.style.display = state.showTransferStok ? '' : 'none';
+  });
+
+  // Show / Hide Admin Process Mode Container (ONLY visible when show_transfer_stok is TRUE)
+  if (DOM.adminProcessModeContainer) {
+    DOM.adminProcessModeContainer.style.display = state.showTransferStok ? '' : 'none';
+  }
+
+  // Update Process Mode Toggle UI
+  const isHods = (state.transferProcessMode === 'HODS');
+  if (DOM.adminProcessModeToggle) {
+    DOM.adminProcessModeToggle.checked = isHods;
+  }
+  if (DOM.adminProcessModeLabel) {
+    DOM.adminProcessModeLabel.textContent = isHods ? 'HODS' : 'STAFPART';
+    DOM.adminProcessModeLabel.style.color = isHods ? 'var(--warning)' : 'var(--primary)';
+  }
+  if (DOM.adminProcessModeDesc) {
+    DOM.adminProcessModeDesc.textContent = isHods
+      ? 'HODS: Otomatis menjadi SKM (tanpa perlu milih dropdown SKM/HIT).'
+      : 'STAFPART: Memerlukan pilihan dropdown SKM / HIT saat pengerjaan stok.';
+  }
+
+  // Redirect if currently on a scan tab and transfer stok is disabled
+  if (!state.showTransferStok && (state.activeTab === 'tab-scan' || state.activeTab === 'tab-history')) {
+    switchTab('tab-menu', false);
   }
 }
 
@@ -417,6 +628,7 @@ function updateUIFromState() {
   // Render Draft & History Lists
   renderDraftList();
   renderHistory();
+  applyTransferStokVisibilityUI();
   
   lucide.createIcons();
 }
@@ -444,12 +656,157 @@ function setupEventListeners() {
   // Mode Hub Cards Click Listeners
   if (DOM.btnSelectModeScan) {
     DOM.btnSelectModeScan.addEventListener('click', () => {
+      if (!state.showTransferStok) {
+        showToast('Menu Transfer Stok sedang dinonaktifkan oleh Admin', 'warning');
+        return;
+      }
       requestTabSwitch('tab-scan');
+    });
+  }
+
+  // Admin App Settings Toggle Listener (Show/Hide Transfer Stok)
+  if (DOM.adminTransferStokToggle) {
+    DOM.adminTransferStokToggle.addEventListener('change', async (e) => {
+      const isChecked = e.target.checked;
+      state.showTransferStok = isChecked;
+      applyTransferStokVisibilityUI();
+      showToast(`Menu Transfer Stok ${isChecked ? 'DITAMPILKAN' : 'DISEMBUNYIKAN'} di semua perangkat`, 'info');
+
+      if (state.supabaseClient) {
+        try {
+          const { error } = await state.supabaseClient
+            .from('app_settings')
+            .upsert({
+              setting_key: 'show_transfer_stok',
+              setting_value: isChecked ? 'true' : 'false',
+              updated_at: new Date().toISOString()
+            });
+
+          if (error) {
+            console.error('Upsert app_settings error:', error);
+            showToast(`Gagal update Supabase: ${error.message}`, 'error');
+          }
+
+          if (state.appSettingsChannel) {
+            state.appSettingsChannel.send({
+              type: 'broadcast',
+              event: 'toggle_transfer_stok',
+              payload: { enabled: isChecked }
+            });
+          }
+        } catch (err) {
+          console.error('Error saving app_settings toggle:', err);
+        }
+      }
+    });
+  }
+
+  // Admin App Settings Toggle Listener (Process Mode: STAFPART / HODS)
+  if (DOM.adminProcessModeToggle) {
+    DOM.adminProcessModeToggle.addEventListener('change', async (e) => {
+      const isHods = e.target.checked;
+      const targetMode = isHods ? 'HODS' : 'STAFPART';
+      state.transferProcessMode = targetMode;
+      applyTransferStokVisibilityUI();
+      showToast(`Mode Proses Transfer diubah ke ${targetMode}`, 'info');
+
+      if (state.supabaseClient) {
+        try {
+          const { error } = await state.supabaseClient
+            .from('app_settings')
+            .upsert({
+              setting_key: 'transfer_process_mode',
+              setting_value: targetMode,
+              updated_at: new Date().toISOString()
+            });
+
+          if (error) {
+            console.error('Upsert app_settings error:', error);
+            showToast(`Gagal update mode proses: ${error.message}`, 'error');
+          }
+
+          if (state.appSettingsChannel) {
+            state.appSettingsChannel.send({
+              type: 'broadcast',
+              event: 'toggle_process_mode',
+              payload: { mode: targetMode }
+            });
+          }
+        } catch (err) {
+          console.error('Error saving process mode setting:', err);
+        }
+      }
     });
   }
   if (DOM.btnSelectModeTeknisi) {
     DOM.btnSelectModeTeknisi.addEventListener('click', () => {
       requestTabSwitch('tab-pending');
+    });
+  }
+  if (DOM.btnSelectModePipo) {
+    DOM.btnSelectModePipo.addEventListener('click', () => {
+      requestTabSwitch('tab-pipo');
+    });
+  }
+  if (DOM.btnSelectModeFinish) {
+    DOM.btnSelectModeFinish.addEventListener('click', () => {
+      requestTabSwitch('tab-finish');
+    });
+  }
+  if (DOM.btnSelectModePartKembali) {
+    DOM.btnSelectModePartKembali.addEventListener('click', () => {
+      requestTabSwitch('tab-part-kembali');
+    });
+  }
+  if (DOM.btnSelectModeTagihan) {
+    DOM.btnSelectModeTagihan.addEventListener('click', () => {
+      requestTabSwitch('tab-tagihan');
+    });
+  }
+  if (DOM.btnSubmitFinish) {
+    DOM.btnSubmitFinish.addEventListener('click', openFinishConfirmModal);
+  }
+  if (DOM.headerBtnMissing) DOM.headerBtnMissing.addEventListener('click', () => openMissingModal(false));
+  if (DOM.btnOpenMissingModal) DOM.btnOpenMissingModal.addEventListener('click', () => openMissingModal(false));
+  if (DOM.btnCloseMissingModal) DOM.btnCloseMissingModal.addEventListener('click', closeMissingModal);
+  if (DOM.btnDismissMissingModal) DOM.btnDismissMissingModal.addEventListener('click', closeMissingModal);
+  if (DOM.btnRefreshMissing) {
+    DOM.btnRefreshMissing.addEventListener('click', () => {
+      showToast('🔄 Memperbarui data dari Google Sheet...', 'info');
+      openMissingModal(false);
+    });
+  }
+
+  // PIPO Search & Refresh Listeners
+  if (DOM.btnRefreshPipo) {
+    DOM.btnRefreshPipo.addEventListener('click', () => {
+      showToast('🔄 Memperbarui data Part Pengganti (PIPO)...', 'info');
+      fetchPipoData();
+    });
+  }
+
+  if (DOM.inputSearchPipo) {
+    let pipoTimer = null;
+    DOM.inputSearchPipo.addEventListener('input', (e) => {
+      const val = e.target.value;
+      if (DOM.btnClearSearchPipo) {
+        DOM.btnClearSearchPipo.style.display = val ? 'block' : 'none';
+      }
+      if (pipoTimer) clearTimeout(pipoTimer);
+      pipoTimer = setTimeout(() => {
+        state.pipoSearchQuery = val;
+        state.pipoLimit = 40;
+        renderPipoTab();
+      }, 100);
+    });
+  }
+
+  if (DOM.btnClearSearchPipo) {
+    DOM.btnClearSearchPipo.addEventListener('click', () => {
+      state.pipoSearchQuery = '';
+      if (DOM.inputSearchPipo) DOM.inputSearchPipo.value = '';
+      DOM.btnClearSearchPipo.style.display = 'none';
+      renderPipoTab();
     });
   }
 
@@ -466,12 +823,12 @@ function setupEventListeners() {
     });
   }
 
-  // Google Sheets Refresh & Search Listeners
+  // Refresh & Search Listeners
   if (DOM.sheetUpdateBar) {
     DOM.sheetUpdateBar.style.cursor = 'pointer';
-    DOM.sheetUpdateBar.title = 'Klik untuk refresh data Google Sheet';
+    DOM.sheetUpdateBar.title = 'Klik untuk refresh data aplikasi';
     DOM.sheetUpdateBar.addEventListener('click', () => {
-      showToast('🔄 Memperbarui data dari Google Sheet...', 'info');
+      showToast('🔄 Memperbarui data...', 'info');
       fetchGoogleSheetsData();
     });
   }
@@ -541,11 +898,25 @@ function setupEventListeners() {
   if (DOM.btnCancelUserForm) DOM.btnCancelUserForm.addEventListener('click', closeUserModal);
   if (DOM.btnSaveUserForm) DOM.btnSaveUserForm.addEventListener('click', handleSaveUserForm);
 
+  // Queue Modal Back to Main Menu Button
+  if (DOM.btnQueueBackMenu) {
+    DOM.btnQueueBackMenu.addEventListener('click', () => {
+      if (DOM.modalQueue) DOM.modalQueue.classList.remove('active');
+      switchTab('tab-menu');
+    });
+  }
+
+  let lastBackPressTime = 0;
+
   // Android & Hardware Back Button Navigation Handler
   window.addEventListener('popstate', (e) => {
     if (!state.isLoggedIn) return;
 
     // 1. Close active modals first if open
+    if (DOM.modalMissingFinish && DOM.modalMissingFinish.classList.contains('active')) {
+      closeMissingModal(false);
+      return;
+    }
     if (DOM.modalUserForm && DOM.modalUserForm.classList.contains('active')) {
       closeUserModal();
       try { history.pushState({ tab: state.activeTab }, '', '#' + state.activeTab); } catch (err) {}
@@ -557,10 +928,25 @@ function setupEventListeners() {
       return;
     }
 
-    // 2. Determine target tab: default to 'tab-menu' if e.state is missing or empty
-    const targetTab = (e.state && e.state.tab) ? e.state.tab : 'tab-menu';
+    // 2. Intercept Back when at Main Menu (tab-menu)
+    if (state.activeTab === 'tab-menu') {
+      const now = Date.now();
+      if (now - lastBackPressTime < 2000) {
+        // Press twice within 2 seconds: Allow exit / back out
+        return;
+      }
 
-    // 3. Tab Navigation: check if leaving tab-scan with draft items
+      // First press back: push state back & show exit warning toast
+      lastBackPressTime = now;
+      try { history.pushState({ tab: 'tab-menu' }, '', '#tab-menu'); } catch (err) {}
+      showToast('Tekan sekali lagi untuk keluar', 'warning');
+      return;
+    }
+
+    // 3. Determine target tab: default to 'tab-menu' if e.state is missing or empty
+    let targetTab = (e.state && e.state.tab) ? e.state.tab : 'tab-menu';
+
+    // 4. Tab Navigation: check if leaving tab-scan with draft items
     if (state.activeTab === 'tab-scan' && state.draftList.length > 0 && targetTab !== 'tab-scan') {
       try { history.pushState({ tab: 'tab-scan' }, '', '#tab-scan'); } catch (err) {}
       state.modalAction = 'switchTabWarn';
@@ -676,6 +1062,8 @@ async function handleConfirmModalOk() {
 
   if (currentAction === 'submit') {
     await handleSubmitBatchToSupabase();
+  } else if (currentAction === 'submitFinish') {
+    await handleSubmitFinish();
   } else if (currentAction === 'logout') {
     performLogout();
   } else if (currentAction === 'clearHistory') {
@@ -976,30 +1364,40 @@ function updateModeNavVisibility(targetTabId) {
     state.currentMode = 'menu';
   } else if (targetTabId === 'tab-scan' || targetTabId === 'tab-history') {
     state.currentMode = 'scan';
-  } else if (targetTabId === 'tab-pending' || targetTabId === 'tab-performa' || targetTabId === 'tab-notif') {
+  } else if (targetTabId === 'tab-pending' || targetTabId === 'tab-performa' || targetTabId === 'tab-notif' || targetTabId === 'tab-part-kembali' || targetTabId === 'tab-tagihan') {
     state.currentMode = 'teknisi';
+  } else if (targetTabId === 'tab-pipo') {
+    state.currentMode = 'pipo';
+  } else if (targetTabId === 'tab-finish') {
+    state.currentMode = 'finish';
   }
 
   // 1. PSW Status Badge (PSW: ON/OFF)
-  // Hide on teknisi mode & menu mode, show only on scan mode or profile
+  // Hide on PIPO, Finish, Teknisi portal, and Menu hub. Show ONLY on Scan mode or Profile.
   if (DOM.headerPswStatus) {
-    DOM.headerPswStatus.classList.toggle('hidden', state.currentMode === 'teknisi' || state.currentMode === 'menu');
+    DOM.headerPswStatus.classList.toggle('hidden', state.currentMode !== 'scan' && targetTabId !== 'tab-profile');
   }
 
-  // 2. Header Bell Notification Button (#header-notif-btn)
+  // 2. Header LIHAT DATA Button (#header-btn-missing)
+  // Show ONLY in finish mode (tab-finish), replacing the PSW badge in top right header!
+  if (DOM.headerBtnMissing) {
+    DOM.headerBtnMissing.classList.toggle('hidden', targetTabId !== 'tab-finish');
+  }
+
+  // 3. Header Bell Notification Button (#header-notif-btn)
   // Show ONLY when in teknisi mode (Pending / Performa / Notif), hide in scan mode & menu hub!
   if (DOM.headerNotifBtn) {
     DOM.headerNotifBtn.classList.toggle('hidden', state.currentMode !== 'teknisi');
   }
 
-  // 3. On tab-menu (Menu Utama Hub), hide bottom navbar & sheet update bar completely!
+  // 4. On tab-menu (Menu Utama Hub), hide bottom navbar & sheet update bar completely!
   if (targetTabId === 'tab-menu') {
     if (DOM.appNav) DOM.appNav.classList.add('hidden');
     if (DOM.sheetUpdateBar) DOM.sheetUpdateBar.classList.add('hidden');
     return;
   }
 
-  // 4. On sub-pages, show bottom navbar
+  // 5. On sub-pages, show bottom navbar
   if (DOM.appNav) DOM.appNav.classList.remove('hidden');
 
   // Show sheet update bar only when in teknisi mode
@@ -1045,6 +1443,21 @@ function switchTab(targetTabId, pushState = true) {
   DOM.tabContents.forEach(content => {
     content.classList.toggle('active', content.id === targetTabId);
   });
+
+  // Toggle Global Queue Modal visibility based on active tab (Show ONLY on Transfer Stok: tab-scan & tab-history)
+  if (state.isGlobalQueueBlocking && (targetTabId === 'tab-scan' || targetTabId === 'tab-history')) {
+    if (DOM.modalQueue) DOM.modalQueue.classList.add('active');
+  } else {
+    if (DOM.modalQueue) DOM.modalQueue.classList.remove('active');
+  }
+
+  if (targetTabId === 'tab-pipo') {
+    renderPipoTab();
+  }
+  if (targetTabId === 'tab-finish') {
+    prepareFinishForm();
+    renderFinishHistory();
+  }
 
   lucide.createIcons();
 }
@@ -1388,6 +1801,7 @@ async function handleSubmitBatchToSupabase() {
     qty: item.qty,
     use_password: state.profile.usePsw,
     password: state.profile.usePsw ? (state.profile.psw || '') : '',
+    process_mode: state.transferProcessMode || 'STAFPART',
     status: 'pending',
     created_at: new Date().toISOString()
   }));
@@ -1402,17 +1816,19 @@ async function handleSubmitBatchToSupabase() {
         .insert(batchPayloads)
         .select('id, status');
 
-      // Fallback if unit_id or jenis column does not exist in Supabase schema yet
+      // Fallback if unit_id, jenis, or process_mode column does not exist in Supabase schema yet
       if (error && error.message) {
         const hasMissingUnit = error.message.includes('unit_id');
         const hasMissingJenis = error.message.includes('jenis');
+        const hasMissingProcessMode = error.message.includes('process_mode');
 
-        if (hasMissingUnit || hasMissingJenis) {
+        if (hasMissingUnit || hasMissingJenis || hasMissingProcessMode) {
           console.warn('Column missing in Supabase schema, retrying fallback payload...', error.message);
           const fallbackPayloads = batchPayloads.map(p => {
             const payloadCopy = { ...p };
             if (hasMissingUnit) delete payloadCopy.unit_id;
             if (hasMissingJenis) delete payloadCopy.jenis;
+            if (hasMissingProcessMode) delete payloadCopy.process_mode;
             return payloadCopy;
           });
 
@@ -1534,11 +1950,15 @@ function openGlobalQueueModal(pendingRecords = []) {
     }
   }
 
-  if (!state.isGlobalQueueBlocking) {
-    state.isGlobalQueueBlocking = true;
-    if (DOM.queueStatusText) DOM.queueStatusText.textContent = 'MENGANTRI / DIPROSES...';
+  state.isGlobalQueueBlocking = true;
+  if (DOM.queueStatusText) DOM.queueStatusText.textContent = 'MENGANTRI / DIPROSES...';
+
+  // Show modal ONLY IF user is currently on Transfer Stok menu (tab-scan or tab-history)
+  if (state.activeTab === 'tab-scan' || state.activeTab === 'tab-history') {
     if (DOM.modalQueue) DOM.modalQueue.classList.add('active');
     lucide.createIcons();
+  } else {
+    if (DOM.modalQueue) DOM.modalQueue.classList.remove('active');
   }
 }
 
@@ -1868,6 +2288,785 @@ async function performDeleteUser() {
 // GOOGLE SHEETS LIVE DATA INTEGRATION & CACHE MODULE
 // ==========================================
 const GOOGLE_SHEET_ID = '1YhZ9aC-ypray0WwSZxY5dXNVraqLm-BNIuyWYNUkUQ0';
+const GOOGLE_SHEET_ID_PIPO = '1cFbwWRRxD6vj7XNFLzmxF_Mma9TP3qvsdMSEYIDg47M';
+
+window.copyTextToClipboard = function(text, label = 'Kode Part') {
+  if (!text || text === '-') return;
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(() => {
+      showToast(`📋 ${label} (${text}) berhasil disalin!`, 'success');
+    }).catch(() => {
+      fallbackCopyText(text, label);
+    });
+  } else {
+    fallbackCopyText(text, label);
+  }
+};
+
+function fallbackCopyText(text, label) {
+  try {
+    const input = document.createElement('input');
+    input.value = text;
+    document.body.appendChild(input);
+    input.select();
+    document.execCommand('copy');
+    input.remove();
+    showToast(`📋 ${label} (${text}) berhasil disalin!`, 'success');
+  } catch (e) {
+    showToast(`Gagal menyalin: ${text}`, 'error');
+  }
+}
+
+async function fetchGVizSheetCustom(sheetId, sheetName) {
+  try {
+    return await new Promise((resolve, reject) => {
+      const callbackName = 'gviz_cb_' + Math.floor(Math.random() * 1000000);
+      const timeout = setTimeout(() => {
+        if (window[callbackName]) delete window[callbackName];
+        const el = document.getElementById(callbackName);
+        if (el) el.remove();
+        reject(new Error(`Timeout fetching sheet ${sheetName}`));
+      }, 10000);
+
+      window[callbackName] = function(response) {
+        clearTimeout(timeout);
+        delete window[callbackName];
+        const el = document.getElementById(callbackName);
+        if (el) el.remove();
+        if (response && response.table) {
+          resolve(response.table);
+        } else {
+          reject(new Error(`Response table invalid for sheet ${sheetName}`));
+        }
+      };
+
+      const script = document.createElement('script');
+      script.id = callbackName;
+      script.src = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=responseHandler:${callbackName}&sheet=${encodeURIComponent(sheetName)}&t=${Date.now()}`;
+      script.onerror = function(err) {
+        clearTimeout(timeout);
+        if (window[callbackName]) delete window[callbackName];
+        script.remove();
+        reject(err);
+      };
+      document.body.appendChild(script);
+    });
+  } catch (jsonpErr) {
+    const url = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(sheetName)}&t=${Date.now()}`;
+    const res = await fetch(url);
+    const text = await res.text();
+    const jsonMatch = text.match(/google\.visualization\.Query\.setResponse\(([\s\S]*)\);?/);
+    if (!jsonMatch) throw new Error(`Format respon Google Sheet ${sheetName} tidak valid`);
+    const parsed = JSON.parse(jsonMatch[1]);
+    return parsed.table;
+  }
+}
+
+function loadPipoCache() {
+  const cached = localStorage.getItem(STORAGE_KEYS.PIPO_CACHE);
+  if (cached) {
+    try {
+      const parsed = JSON.parse(cached);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        state.pipoData = parsed.map(item => {
+          if (Array.isArray(item)) {
+            return {
+              typeOff: item[0] || '',
+              partOff: item[1] || '',
+              namaOff: item[2] || '',
+              typeIn: item[3] || '',
+              partIn: item[4] || '',
+              namaIn: item[5] || '',
+              teknisi: item[6] || '',
+              hasilCek: item[7] || 'BISA MENGGANTIKAN'
+            };
+          }
+          return item;
+        });
+        renderPipoTab();
+      }
+    } catch (e) {
+      console.warn('Gagal parse cache PIPO:', e);
+    }
+  }
+}
+
+function savePipoCache() {
+  if (!state.pipoData || state.pipoData.length === 0) return;
+
+  try {
+    // Compress objects into compact 2D tuple matrix (saves >75% LocalStorage quota space)
+    const compactMatrix = state.pipoData.map(item => [
+      item.typeOff || '',
+      item.partOff || '',
+      item.namaOff || '',
+      item.typeIn || '',
+      item.partIn || '',
+      item.namaIn || '',
+      item.teknisi || '',
+      item.hasilCek || ''
+    ]);
+
+    localStorage.setItem(STORAGE_KEYS.PIPO_CACHE, JSON.stringify(compactMatrix));
+  } catch (e) {
+    console.warn('Quota LocalStorage penuh, membersihkan cache lama...', e);
+    try {
+      localStorage.removeItem('google_sheets_cache');
+      const compactMatrix = state.pipoData.slice(0, 1000).map(item => [
+        item.typeOff || '',
+        item.partOff || '',
+        item.namaOff || '',
+        item.typeIn || '',
+        item.partIn || '',
+        item.namaIn || '',
+        item.teknisi || '',
+        item.hasilCek || ''
+      ]);
+      localStorage.setItem(STORAGE_KEYS.PIPO_CACHE, JSON.stringify(compactMatrix));
+    } catch (err2) {
+      // Silent fallback: app runs seamlessly using in-memory state
+    }
+  }
+}
+
+async function fetchPipoData() {
+  if (state.isFetchingPipo) return;
+  state.isFetchingPipo = true;
+
+  try {
+    const tablePipo = await fetchGVizSheetCustom(GOOGLE_SHEET_ID_PIPO, 'PIPO');
+    const rows = extractMatrixFromGViz(tablePipo);
+
+    const pipoItems = [];
+    for (let r = 1; r < rows.length; r++) {
+      const row = rows[r];
+      if (!row || row.length < 5) continue;
+
+      const typeOff = row[0] || '';
+      const partOff = row[1] || '';
+      const namaOff = row[2] || '';
+      const typeIn = row[3] || '';
+      const partIn = row[4] || '';
+      const namaIn = row[5] || '';
+      const teknisi = row[6] || '';
+      const hasilCek = row[7] || 'BISA MENGGANTIKAN';
+
+      if (partOff || partIn) {
+        pipoItems.push({
+          typeOff,
+          partOff,
+          namaOff,
+          typeIn,
+          partIn,
+          namaIn,
+          teknisi,
+          hasilCek
+        });
+      }
+    }
+
+    state.pipoData = pipoItems;
+    savePipoCache();
+    renderPipoTab();
+
+  } catch (err) {
+    console.warn('Gagal fetch data PIPO Sheet:', err);
+    if (DOM.pipoListContainer) {
+      // If cache exists, keep using cached data
+      if (state.pipoData && state.pipoData.length > 0) {
+        renderPipoTab();
+      } else {
+        DOM.pipoListContainer.innerHTML = `
+          <div class="empty-state-sm text-danger">
+            <i data-lucide="alert-circle"></i>
+            <p>Gagal memuat data PIPO: ${escapeHtml(err.message)}</p>
+          </div>`;
+        lucide.createIcons();
+      }
+    }
+  } finally {
+    state.isFetchingPipo = false;
+  }
+}
+
+function renderPipoTab() {
+  if (!DOM.pipoListContainer) return;
+  if (!DOM.pipoDefaultHeader) {
+    DOM.pipoDefaultHeader = document.getElementById('pipo-default-header');
+  }
+
+  const list = state.pipoData || [];
+  const searchQ = (state.pipoSearchQuery || '').trim().toUpperCase();
+
+  // ==========================================================
+  // MODE 1: TAMPILAN DATA DEFAULT (TANPA PENCARIAN)
+  // Simpel perbaris: Kolom B (Kiri) ⇄ Kolom E (Kanan) - No Gudang SAJA
+  // ==========================================================
+  if (!searchQ) {
+    if (DOM.pipoDefaultHeader) DOM.pipoDefaultHeader.style.display = 'grid';
+
+    if (DOM.pipoCount) {
+      DOM.pipoCount.textContent = `${list.length} Data`;
+    }
+
+    if (list.length === 0) {
+      DOM.pipoListContainer.innerHTML = `
+        <div class="empty-state-sm">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--text-muted);margin-bottom:6px;"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+          <p>Belum ada data part pengganti.</p>
+        </div>`;
+      return;
+    }
+
+    const maxLimit = state.pipoLimit || 50;
+    const visibleList = list.slice(0, maxLimit);
+
+    let html = visibleList.map((item) => {
+      const b = (item.partOff || '-').trim();
+      const e = (item.partIn || '-').trim();
+      const targetQuery = b !== '-' ? b : e;
+      return `
+        <div class="pipo-simple-row" onclick="fillPipoSearch('${escapeHtml(targetQuery)}')">
+          <div class="pipo-col-left">${escapeHtml(b)}</div>
+          <div class="pipo-col-mid"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="color:var(--warning);"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg></div>
+          <div class="pipo-col-right">${escapeHtml(e)}</div>
+        </div>
+      `;
+    }).join('');
+
+    if (list.length > maxLimit) {
+      html += `
+        <div class="my-3" style="padding: 6px 0 16px 0;">
+          <button type="button" class="btn-load-more-pipo" onclick="window.loadMorePipoItems()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><polyline points="19 12 12 19 5 12"></polyline></svg>
+            Tampilkan Lebih Banyak (${visibleList.length} dari ${list.length} Data)
+          </button>
+        </div>`;
+    }
+
+    DOM.pipoListContainer.innerHTML = html;
+    return;
+  }
+
+  // ==========================================================
+  // MODE 2: TAMPILAN HASIL PENCARIAN (DETAIL KATA KUNCI)
+  // Sederhana tapi detail: No Gudang, Deskripsi, Type (A/D)
+  // ==========================================================
+  if (DOM.pipoDefaultHeader) DOM.pipoDefaultHeader.style.display = 'none';
+
+  const uniqueReplacementsMap = new Map();
+
+  for (let i = 0; i < list.length; i++) {
+    const item = list[i];
+    const partOff = (item.partOff || '').trim();
+    const partOffUpper = partOff.toUpperCase();
+    const namaOff = item.namaOff || '';
+    const typeOff = item.typeOff || '';
+
+    const partIn = (item.partIn || '').trim();
+    const partInUpper = partIn.toUpperCase();
+    const namaIn = item.namaIn || '';
+    const typeIn = item.typeIn || '';
+
+    if (!partOff && !partIn) continue;
+
+    const matchOff = partOffUpper.includes(searchQ) || (namaOff && namaOff.toUpperCase().includes(searchQ)) || (typeOff && typeOff.toUpperCase().includes(searchQ));
+    const matchIn = partInUpper.includes(searchQ) || (namaIn && namaIn.toUpperCase().includes(searchQ)) || (typeIn && typeIn.toUpperCase().includes(searchQ));
+
+    // Direction A: Searched part matches PLUG OFF -> Replacement is PLUG IN
+    if (matchOff && partIn) {
+      if (!uniqueReplacementsMap.has(partInUpper)) {
+        uniqueReplacementsMap.set(partInUpper, {
+          partNo: partIn,
+          namaPart: namaIn,
+          type: typeIn || typeOff
+        });
+      }
+    }
+
+    // Direction B: Searched part matches PLUG IN -> Replacement is PLUG OFF
+    if (matchIn && partOff) {
+      if (!uniqueReplacementsMap.has(partOffUpper)) {
+        uniqueReplacementsMap.set(partOffUpper, {
+          partNo: partOff,
+          namaPart: namaOff,
+          type: typeOff
+        });
+      }
+    }
+  }
+
+  const replacementsArray = Array.from(uniqueReplacementsMap.values());
+
+  if (DOM.pipoCount) {
+    DOM.pipoCount.textContent = `${replacementsArray.length} Data`;
+  }
+
+  if (replacementsArray.length === 0) {
+    DOM.pipoListContainer.innerHTML = `
+      <div class="empty-state-sm">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--text-muted);margin-bottom:6px;"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line><line x1="8" y1="11" x2="14" y2="11"></line></svg>
+        <p>Part pengganti tidak ditemukan untuk "${escapeHtml(state.pipoSearchQuery)}".</p>
+      </div>`;
+    return;
+  }
+
+  const maxLimit = state.pipoLimit || 60;
+  const visibleReplacements = replacementsArray.slice(0, maxLimit);
+
+  let html = visibleReplacements.map(rep => `
+    <div class="pipo-card">
+      <div class="pipo-sub-part-no">${escapeHtml(rep.partNo || '-')}</div>
+      ${rep.namaPart ? `<div class="pipo-sub-part-desc">${escapeHtml(rep.namaPart)}</div>` : ''}
+      ${rep.type ? `<div class="pipo-sub-type-badge">Type: ${escapeHtml(rep.type)}</div>` : ''}
+    </div>
+  `).join('');
+
+  if (replacementsArray.length > maxLimit) {
+    html += `
+      <div class="my-3" style="padding: 6px 0 16px 0;">
+        <button type="button" class="btn-load-more-pipo" onclick="window.loadMorePipoItems()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><polyline points="19 12 12 19 5 12"></polyline></svg>
+          Tampilkan Lebih Banyak (${visibleReplacements.length} dari ${replacementsArray.length} Part)
+        </button>
+      </div>`;
+  }
+
+  DOM.pipoListContainer.innerHTML = html;
+}
+
+// ==========================================================
+// MODULE INPUT FINISH HARIAN TEKNISI (GOOGLE FORM REPLACEMENT)
+// ==========================================================
+const GOOGLE_FORM_FINISH_URL = 'https://docs.google.com/forms/d/e/1FAIpQLSfHo-PIyYWBsEcfUfkpA8vc7AyeuAMNRot4wuU5T3xSNfcYnA/formResponse';
+
+const VALID_FORM_TECHNICIANS = [
+  'Amin Prayogo',
+  'Redi Takwa',
+  'Zulfi Fajriansyah',
+  'Mursyid Alfiansyah',
+  'M.Ilman',
+  'SID Kenu ngudi Raharjo',
+  'Irfan Taufan',
+  'Roni Surya Nugraha'
+];
+
+function prepareFinishForm() {
+  if (DOM.finishTgl && !DOM.finishTgl.value) {
+    const today = new Date().toISOString().split('T')[0];
+    DOM.finishTgl.value = today;
+  }
+
+  // Clear numeric inputs so they are empty by default (no 0)
+  if (DOM.finishCaseOutdoor) DOM.finishCaseOutdoor.value = '';
+  if (DOM.finishFinishOutdoor) DOM.finishFinishOutdoor.value = '';
+  if (DOM.finishFinishIndoor) DOM.finishFinishIndoor.value = '';
+  if (DOM.finishWipComp) DOM.finishWipComp.value = '';
+  if (DOM.finishWipTech) DOM.finishWipTech.value = '';
+  if (DOM.finishBatal) DOM.finishBatal.value = '';
+  if (DOM.finishAntar) DOM.finishAntar.value = '';
+  if (DOM.finishNoVisit) DOM.finishNoVisit.value = '';
+  if (DOM.finishKet) DOM.finishKet.value = '';
+
+  if (DOM.finishNama) {
+    const rawList = [...VALID_FORM_TECHNICIANS];
+    if (state.adminUsers && state.adminUsers.length > 0) {
+      state.adminUsers.forEach(u => {
+        if (u.nama && u.nama.trim()) rawList.push(u.nama.trim());
+      });
+    }
+
+    // Deduplicate case-insensitively
+    const seen = new Set();
+    const choices = [];
+    rawList.forEach(name => {
+      const normalized = name.trim().toLowerCase();
+      if (!seen.has(normalized)) {
+        seen.add(normalized);
+        choices.push(name.trim());
+      }
+    });
+
+    const currentSelected = DOM.finishNama.value;
+    DOM.finishNama.innerHTML = choices.map(t =>
+      `<option value="${escapeHtml(t)}">${escapeHtml(t)}</option>`
+    ).join('');
+
+    const loggedInName = state.profile ? state.profile.nama : (state.user ? state.user.nama : '');
+
+    if (state.isAdmin) {
+      DOM.finishNama.disabled = false;
+      if (currentSelected && choices.includes(currentSelected)) {
+        DOM.finishNama.value = currentSelected;
+      }
+    } else {
+      DOM.finishNama.disabled = true;
+      let match = choices.find(
+        t => t.toLowerCase().trim() === loggedInName.toLowerCase().trim()
+      );
+      if (!match) {
+        match = choices.find(
+          t => t.toLowerCase().includes(loggedInName.toLowerCase().trim()) || loggedInName.toLowerCase().includes(t.toLowerCase().trim())
+        );
+      }
+      if (match) {
+        DOM.finishNama.value = match;
+      } else if (loggedInName) {
+        const normLoggedIn = loggedInName.trim().toLowerCase();
+        if (!seen.has(normLoggedIn)) {
+          const opt = document.createElement('option');
+          opt.value = loggedInName.trim();
+          opt.textContent = loggedInName.trim();
+          DOM.finishNama.appendChild(opt);
+        }
+        DOM.finishNama.value = loggedInName.trim();
+      }
+    }
+  }
+}
+
+function openFinishConfirmModal() {
+  const tglVal = DOM.finishTgl ? DOM.finishTgl.value : '';
+  if (!tglVal) {
+    showToast('⚠️ Mohon pilih tanggal laporan!', 'warning');
+    if (DOM.finishTgl) DOM.finishTgl.focus();
+    return;
+  }
+
+  state.modalAction = 'submitFinish';
+  DOM.modalConfirmTitle.innerHTML = `<i data-lucide="clipboard-check"></i> Konfirmasi Kirim Finish Harian`;
+  DOM.modalConfirmMsg.textContent = 'Apakah data yang Anda masukkan sudah benar?';
+  DOM.modalConfirmOkText.textContent = 'Ya, Kirim Laporan';
+  DOM.modalConfirm.classList.add('active');
+  lucide.createIcons();
+}
+
+const INDONESIAN_HOLIDAYS_2026 = [
+  '2026-01-01', '2026-01-16', '2026-02-17', '2026-03-19', '2026-03-20',
+  '2026-03-21', '2026-04-03', '2026-04-05', '2026-05-01', '2026-05-14',
+  '2026-05-27', '2026-05-31', '2026-06-01', '2026-06-16', '2026-08-17',
+  '2026-08-25', '2026-12-25'
+];
+
+function isNationalHolidayOrSunday(d) {
+  if (d.getDay() === 0) return true; // Sunday
+  const isoStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  return INDONESIAN_HOLIDAYS_2026.includes(isoStr);
+}
+
+function formatDateIndoFull(d) {
+  const DAYS_ID = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+  const MONTHS_ID = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+  return `${DAYS_ID[d.getDay()]}, ${String(d.getDate()).padStart(2, '0')} ${MONTHS_ID[d.getMonth()]} ${d.getFullYear()}`;
+}
+
+function normalizeDateString(str) {
+  if (!str) return '';
+  str = String(str).trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str;
+  const dmyMatch = str.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})/);
+  if (dmyMatch) {
+    const day = dmyMatch[1].padStart(2, '0');
+    const month = dmyMatch[2].padStart(2, '0');
+    const year = dmyMatch[3];
+    return `${year}-${month}-${day}`;
+  }
+  const ymdMatch = str.match(/^(\d{4})[\/-](\d{1,2})[\/-](\d{1,2})/);
+  if (ymdMatch) {
+    const year = ymdMatch[1];
+    const month = ymdMatch[2].padStart(2, '0');
+    const day = ymdMatch[3].padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+  return str;
+}
+
+async function fetchFinishSheetData() {
+  const filledDatesSet = new Set();
+  const targetTechName = DOM.finishNama ? DOM.finishNama.value : (state.profile ? state.profile.nama : '');
+
+  // Fetch 100% real-time directly from Google Sheet: 1cFbwWRRxD6vj7XNFLzmxF_Mma9TP3qvsdMSEYIDg47M (Tab: Form Responses 1)
+  const FINISH_SPREADSHEET_ID = '1cFbwWRRxD6vj7XNFLzmxF_Mma9TP3qvsdMSEYIDg47M';
+
+  let rows = [];
+  try {
+    const table = await fetchGVizSheetCustom(FINISH_SPREADSHEET_ID, 'Form Responses 1');
+    rows = extractMatrixFromGViz(table);
+  } catch (e1) {
+    try {
+      const table = await fetchGVizSheetCustom(FINISH_SPREADSHEET_ID, 'Form Responses');
+      rows = extractMatrixFromGViz(table);
+    } catch (e2) {
+      console.warn('Gagal fetch sheet finish response:', e2);
+    }
+  }
+
+  if (rows && rows.length > 0) {
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      if (!row || row.length < 4) continue;
+
+      // Column C (index 2) is Nama Teknisi, Column D (index 3) is Tanggal Laporan
+      const rowNama = String(row[2] || '').trim();
+      const rowTglRaw = String(row[3] || '').trim();
+
+      if (rowNama && rowTglRaw) {
+        const normTgl = normalizeDateString(rowTglRaw);
+        if (normTgl && /^\d{4}-\d{2}-\d{2}$/.test(normTgl)) {
+          if (targetTechName && matchTechName(rowNama, targetTechName)) {
+            filledDatesSet.add(normTgl);
+          }
+        }
+      }
+    }
+  }
+
+  return filledDatesSet;
+}
+
+async function openMissingModal(isAutoRefresh = false) {
+  if (!DOM.modalMissingFinish) return;
+
+  DOM.modalMissingFinish.classList.add('active');
+
+  if (!isAutoRefresh) {
+    try {
+      history.pushState({ modal: 'missing_finish', tab: state.activeTab }, '', '#lihat-data');
+    } catch (e) {}
+  }
+
+  if (DOM.syncIconMissing) DOM.syncIconMissing.classList.add('spinning');
+
+  if (!isAutoRefresh && DOM.missingFinishSummary) {
+    DOM.missingFinishSummary.innerHTML = `
+      <div style="text-align:center; padding:14px; color:var(--text-muted);">
+        <i data-lucide="loader-2" class="spin-lg"></i>
+        <p style="margin-top:6px; font-size:12px; font-weight:600;">Memuat data terbaru dari Google Sheet...</p>
+      </div>`;
+    lucide.createIcons();
+  }
+
+  try {
+    const filledDatesSet = await fetchFinishSheetData();
+    renderMissingDatesList(filledDatesSet);
+  } catch (err) {
+    console.warn('Error openMissingModal:', err);
+  } finally {
+    if (DOM.syncIconMissing) DOM.syncIconMissing.classList.remove('spinning');
+  }
+
+  startMissingAutoRefresh();
+}
+
+function startMissingAutoRefresh() {
+  stopMissingAutoRefresh();
+  state.missingModalTimer = setInterval(() => {
+    if (DOM.modalMissingFinish && DOM.modalMissingFinish.classList.contains('active')) {
+      openMissingModal(true);
+    } else {
+      stopMissingAutoRefresh();
+    }
+  }, 10000); // Auto refresh every 10 seconds
+}
+
+function stopMissingAutoRefresh() {
+  if (state.missingModalTimer) {
+    clearInterval(state.missingModalTimer);
+    state.missingModalTimer = null;
+  }
+}
+
+function renderMissingDatesList(filledDatesSet) {
+  const targetTechName = DOM.finishNama ? DOM.finishNama.value : (state.profile ? state.profile.nama : '');
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth();
+  const todayDate = now.getDate();
+
+  const missingDates = [];
+  let totalWorkingDays = 0;
+  let filledCount = 0;
+
+  for (let day = 1; day <= todayDate; day++) {
+    const d = new Date(year, month, day);
+    if (!isNationalHolidayOrSunday(d)) {
+      totalWorkingDays++;
+      const isoStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      if (filledDatesSet.has(isoStr)) {
+        filledCount++;
+      } else {
+        missingDates.push({ dateStr: isoStr, dateObj: d });
+      }
+    }
+  }
+
+  const MONTHS_ID = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+  const monthLabel = `${MONTHS_ID[month]} ${year}`;
+
+  if (DOM.missingFinishSummary) {
+    DOM.missingFinishSummary.innerHTML = `
+      <div style="background:var(--card-bg-light); border-left:3px solid var(--primary); padding:8px 10px; border-radius:6px; margin-bottom:8px;">
+        <strong style="color:var(--text-color);">${escapeHtml(targetTechName || 'Teknisi')}</strong> &bull; Periode: <strong>${monthLabel}</strong> (s/d Hari Ini)<br/>
+        <span>Total Hari Kerja: <strong>${totalWorkingDays} hari</strong> | Terisi: <strong style="color:var(--success);">${filledCount}</strong> | Belum Isi: <strong style="color:var(--danger);">${missingDates.length}</strong></span>
+      </div>`;
+  }
+
+  if (DOM.missingFinishList) {
+    if (missingDates.length === 0) {
+      DOM.missingFinishList.innerHTML = `
+        <div style="text-align:center; padding:20px 10px; color:var(--success);">
+          <i data-lucide="check-circle-2" style="width:40px; height:40px; margin-bottom:6px;"></i>
+          <p style="font-weight:700; font-size:13px; margin:0;">Luar Biasa! Semua Laporan Terisi</p>
+          <span style="font-size:11px; color:var(--text-muted);">Tidak ada tanggal kerja yang terlewat bulan ini.</span>
+        </div>`;
+    } else {
+      DOM.missingFinishList.innerHTML = missingDates.map(item => `
+        <div class="missing-date-card flex-between align-center" onclick="selectMissingDate('${item.dateStr}')" style="background:var(--card-bg-light); padding:10px 12px; border-radius:8px; border:1px solid var(--border-color); cursor:pointer; transition:all 0.2s ease;">
+          <div>
+            <div style="font-weight:700; font-size:13px; color:var(--text-color);">${escapeHtml(formatDateIndoFull(item.dateObj))}</div>
+            <div style="font-size:10.5px; color:var(--danger); margin-top:1px;"><i data-lucide="alert-circle" style="width:11px; height:11px; vertical-align:middle; margin-right:2px;"></i>Belum ada laporan finish harian</div>
+          </div>
+          <button type="button" class="btn btn-primary btn-xs" style="font-weight:600; padding:4px 8px; font-size:11px;">
+            Pilih Tanggal <i data-lucide="arrow-right" style="width:12px; height:12px;"></i>
+          </button>
+        </div>
+      `).join('');
+    }
+  }
+
+  lucide.createIcons();
+}
+
+function closeMissingModal(triggerHistoryBack = true) {
+  stopMissingAutoRefresh();
+  if (DOM.modalMissingFinish) {
+    const wasActive = DOM.modalMissingFinish.classList.contains('active');
+    DOM.modalMissingFinish.classList.remove('active');
+    if (wasActive && triggerHistoryBack && history.state && history.state.modal === 'missing_finish') {
+      try { history.back(); } catch (e) {}
+    }
+  }
+}
+
+window.selectMissingDate = function(dateStr) {
+  if (DOM.finishTgl) {
+    DOM.finishTgl.value = dateStr;
+  }
+  closeMissingModal();
+  showToast(`📅 Tanggal ${dateStr} dipilih untuk diisi!`, 'info');
+};
+
+async function handleSubmitFinish() {
+  const namaTeknisi = DOM.finishNama ? DOM.finishNama.value.trim() : (state.user ? state.user.nama : (state.loggedInUser || ''));
+  const tglVal = DOM.finishTgl ? DOM.finishTgl.value : '';
+  const caseOutdoor = (DOM.finishCaseOutdoor && DOM.finishCaseOutdoor.value.trim() !== '') ? DOM.finishCaseOutdoor.value.trim() : '0';
+  const finishOutdoor = (DOM.finishFinishOutdoor && DOM.finishFinishOutdoor.value.trim() !== '') ? DOM.finishFinishOutdoor.value.trim() : '0';
+  const finishIndoor = (DOM.finishFinishIndoor && DOM.finishFinishIndoor.value.trim() !== '') ? DOM.finishFinishIndoor.value.trim() : '0';
+  const wipComp = (DOM.finishWipComp && DOM.finishWipComp.value.trim() !== '') ? DOM.finishWipComp.value.trim() : '0';
+  const wipTech = (DOM.finishWipTech && DOM.finishWipTech.value.trim() !== '') ? DOM.finishWipTech.value.trim() : '0';
+  const caseBatal = (DOM.finishBatal && DOM.finishBatal.value.trim() !== '') ? DOM.finishBatal.value.trim() : '0';
+  const pengembalian = (DOM.finishAntar && DOM.finishAntar.value.trim() !== '') ? DOM.finishAntar.value.trim() : '0';
+  const noVisit = (DOM.finishNoVisit && DOM.finishNoVisit.value.trim() !== '') ? DOM.finishNoVisit.value.trim() : '0';
+  const ket = (DOM.finishKet && DOM.finishKet.value.trim() !== '') ? DOM.finishKet.value.trim() : '-';
+
+  if (!tglVal) {
+    showToast('⚠️ Mohon pilih tanggal laporan!', 'warning');
+    if (DOM.finishTgl) DOM.finishTgl.focus();
+    return;
+  }
+
+  // Match technician name to Google Form dropdown option
+  let matchedNama = VALID_FORM_TECHNICIANS.find(
+    t => t.toLowerCase().trim() === namaTeknisi.toLowerCase().trim()
+  );
+  if (!matchedNama) {
+    matchedNama = VALID_FORM_TECHNICIANS.find(
+      t => t.toLowerCase().includes(namaTeknisi.toLowerCase().trim()) || namaTeknisi.toLowerCase().includes(t.toLowerCase().trim())
+    ) || namaTeknisi;
+  }
+
+  // Send directly to Google Form endpoint
+  const formData = new URLSearchParams();
+  formData.append('entry.969834049', matchedNama);
+
+  if (tglVal) {
+    const parts = tglVal.split('-');
+    if (parts.length === 3) {
+      formData.append('entry.768881015_year', parts[0]);
+      formData.append('entry.768881015_month', parts[1]);
+      formData.append('entry.768881015_day', parts[2]);
+    }
+    formData.append('entry.768881015', tglVal);
+  }
+
+  formData.append('entry.70099420', caseOutdoor);
+  formData.append('entry.700809225', finishOutdoor);
+  formData.append('entry.1959698707', finishIndoor);
+  formData.append('entry.1347707686', wipComp);
+  formData.append('entry.696681271', wipTech);
+  formData.append('entry.1529107143', caseBatal);
+  formData.append('entry.1877397193', pengembalian);
+  formData.append('entry.700484031', noVisit);
+  formData.append('entry.2130929922', ket);
+
+  try {
+    fetch(GOOGLE_FORM_FINISH_URL, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: formData
+    }).catch(err => console.warn('Google Form submit error:', err));
+  } catch (err) {
+    console.warn('Submit error:', err);
+  }
+
+  prepareFinishForm();
+
+  showToast('✅ Finish Harian berhasil dikirim ke Sheet!', 'success');
+  playBeepSound();
+}
+
+function renderFinishHistory() {
+  if (!DOM.finishHistoryList) return;
+  const list = state.finishHistory || [];
+
+  if (list.length === 0) {
+    DOM.finishHistoryList.innerHTML = `
+      <div class="empty-state-sm">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--text-muted);margin-bottom:6px;"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="9" y1="9" x2="15" y2="9"></line><line x1="9" y1="13" x2="15" y2="13"></line></svg>
+        <p>Belum ada riwayat finish harian yang di-submit.</p>
+      </div>`;
+    return;
+  }
+
+  DOM.finishHistoryList.innerHTML = list.map(item => `
+    <div class="finish-history-card">
+      <div class="flex-between align-center mb-1">
+        <span style="font-size:11px; font-weight:600; color:var(--primary);">${escapeHtml(item.nama)}</span>
+        <span style="font-size:10px; color:var(--text-muted);">${escapeHtml(item.timestamp)}</span>
+      </div>
+      <div style="font-weight:700; font-size:13px; color:var(--text-color);">Tanggal: ${escapeHtml(item.tgl)}</div>
+      <div style="font-size:11.5px; color:var(--text-muted); margin-top:2px;">
+        Finish In: ${escapeHtml(item.finishIndoor)} | Finish Out: ${escapeHtml(item.finishOutdoor)} | WIP Comp: ${escapeHtml(item.wipComp)} | Batal: ${escapeHtml(item.batal)}
+      </div>
+      ${item.ket ? `<div style="font-size:11px; color:var(--text-muted); font-style:italic; margin-top:2px;">Ket: ${escapeHtml(item.ket)}</div>` : ''}
+    </div>
+  `).join('');
+}
+
+window.loadMorePipoItems = function() {
+  const currentLimit = state.pipoLimit || 50;
+  state.pipoLimit = currentLimit + 50;
+  renderPipoTab();
+};
+
+window.fillPipoSearch = function(partNo) {
+  if (!DOM.pipoSearchInput) return;
+  DOM.pipoSearchInput.value = partNo;
+  state.pipoSearchQuery = partNo;
+  if (DOM.pipoSearchClear) DOM.pipoSearchClear.style.display = 'block';
+  renderPipoTab();
+};
 
 function levenshteinDistance(a, b) {
   if (a.length === 0) return b.length;
@@ -2225,7 +3424,7 @@ function renderAllSheetsViews() {
 
 function renderSheetUpdateInfo() {
   if (DOM.sheetZ2Timestamp) {
-    DOM.sheetZ2Timestamp.textContent = state.sheetsData.lastUpdateTimestamp || 'Live (Google Sheet)';
+    DOM.sheetZ2Timestamp.textContent = state.sheetsData.lastUpdateTimestamp || 'Live System';
   }
 }
 
