@@ -33,46 +33,48 @@
          ========================================== -->
     <div id="screen-login" class="screen active">
       <div class="login-wrapper">
-        <div class="login-header">
-          <div class="login-logo">
-            <i data-lucide="user"></i>
+        <div class="login-card">
+          <div class="login-header">
+            <div class="login-logo">
+              <i data-lucide="user"></i>
+            </div>
+            <h2>TASIKMALAYA</h2>
+            <p>Masukkan Username / NIK dan Password Anda</p>
           </div>
-          <h2>TASIKMALAYA</h2>
-          <p>Masukkan Username / NIK dan Password Anda</p>
+
+          <form id="form-login" onsubmit="return false;" class="login-form">
+            <div class="form-group">
+              <label for="login-username">Username / NIK Teknisi</label>
+              <div class="input-icon-wrapper">
+                <i data-lucide="user" class="input-icon"></i>
+                <input type="text" id="login-username" placeholder="Masukkan NIK..." required />
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="login-password">Password</label>
+              <div class="input-icon-wrapper">
+                <input type="password" id="login-password" placeholder="Password akun..." required style="padding-left:12px;" />
+                <button type="button" id="btn-login-psw-toggle" class="btn-clear" title="Lihat Password">
+                  <i data-lucide="eye" id="login-psw-eye"></i>
+                </button>
+              </div>
+            </div>
+
+            <div class="remember-row">
+              <label class="checkbox-container">
+                <input type="checkbox" id="remember-me" checked />
+                <span class="checkmark"></span>
+                <span>Simpan Username & Password</span>
+              </label>
+            </div>
+
+            <button type="button" id="btn-do-login" class="btn btn-primary btn-block btn-md">
+              <i data-lucide="log-in"></i>
+              <span>MASUK APLIKASI</span>
+            </button>
+          </form>
         </div>
-
-        <form id="form-login" onsubmit="return false;" class="login-form">
-          <div class="form-group">
-            <label for="login-username">Username / NIK Teknisi</label>
-            <div class="input-icon-wrapper">
-              <i data-lucide="user" class="input-icon"></i>
-              <input type="text" id="login-username" placeholder="Masukkan NIK..." required />
-            </div>
-          </div>
-
-          <div class="form-group">
-            <label for="login-password">Password</label>
-            <div class="input-icon-wrapper">
-              <input type="password" id="login-password" placeholder="Password akun..." required style="padding-left:12px;" />
-              <button type="button" id="btn-login-psw-toggle" class="btn-clear" title="Lihat Password">
-                <i data-lucide="eye" id="login-psw-eye"></i>
-              </button>
-            </div>
-          </div>
-
-          <div class="remember-row">
-            <label class="checkbox-container">
-              <input type="checkbox" id="remember-me" checked />
-              <span class="checkmark"></span>
-              <span>Simpan Username & Password</span>
-            </label>
-          </div>
-
-          <button type="button" id="btn-do-login" class="btn btn-primary btn-block btn-md">
-            <i data-lucide="log-in"></i>
-            <span>MASUK APLIKASI</span>
-          </button>
-        </form>
       </div>
     </div>
 

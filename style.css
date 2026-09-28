@@ -150,8 +150,22 @@ body {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  padding: 24px;
+  align-items: center;
+  padding: 24px 16px;
   background: var(--bg-main);
+  overflow-y: auto;
+}
+
+.login-card {
+  width: 100%;
+  max-width: 400px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 24px 20px;
+  box-shadow: var(--shadow-main);
+  display: flex;
+  flex-direction: column;
 }
 
 .login-header {
