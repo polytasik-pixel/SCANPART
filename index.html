@@ -103,7 +103,7 @@
       <!-- Sheet Live Data Status Bar (Direct Z2 Cell Content) -->
       <div class="sheet-update-bar" id="sheet-update-bar">
         <div class="sheet-update-left">
-          <strong id="sheet-z2-timestamp">Memuat...</strong>
+          <strong id="sheet-z2-timestamp">Memuat data....</strong>
         </div>
       </div>
 
@@ -320,21 +320,38 @@
           <div class="card">
             <div class="card-header">
               <div class="card-title" style="color: var(--primary);">
-                <i data-lucide="package"></i> Part Belum Kembali
+                <i data-lucide="package"></i> Part Bekas
+                <span class="badge-count" id="part-kembali-count">0 Item</span>
               </div>
             </div>
 
-            <div class="empty-state-card" style="padding: 40px 20px; text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px;">
-              <div class="not-available-icon" style="width: 64px; height: 64px; border-radius: 50%; background: rgba(16, 185, 129, 0.12); border: 2px dashed var(--primary); display: flex; align-items: center; justify-content: center; color: var(--primary); margin-bottom: 4px;">
-                <i data-lucide="lock" style="width: 28px; height: 28px;"></i>
+            <!-- Top Summary Box for Total QTY Part -->
+            <div class="part-kembali-summary-box mb-3" style="background: var(--bg-card); border-left: 4px solid var(--primary); padding: 12px 14px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); border-left: 4px solid var(--primary); display: flex; align-items: center; justify-content: space-between; gap: 12px; box-shadow: var(--shadow-main);">
+              <div>
+                <div style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">TOTAL QTY PART BEKAS</div>
+                <div style="font-size: 22px; font-weight: 800; color: var(--primary); margin-top: 2px;" id="part-kembali-total-qty">0 Pcs</div>
               </div>
-              <h3 style="font-size: 1.1rem; font-weight: 800; color: var(--text-main); margin: 0;">BELUM TERSEDIA</h3>
-              <p style="font-size: 0.85rem; color: var(--text-muted); max-width: 300px; margin: 0; line-height: 1.5;">
-                Fitur <strong>Part Belum Kembali</strong> saat ini belum tersedia (sedang dalam tahap pengembangan).
-              </p>
-              <div class="badge-status-info" style="display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px; border-radius: 4px; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--border-color); font-size: 0.78rem; color: var(--text-muted); margin-top: 8px;">
-                <i data-lucide="info" style="width: 14px; height: 14px; color: var(--primary);"></i>
-                <span>Informasi akan diperbarui setelah fitur aktif</span>
+              <div style="width: 44px; height: 44px; border-radius: 50%; background: var(--primary-light); display: flex; align-items: center; justify-content: center; color: var(--primary); flex-shrink: 0;">
+                <i data-lucide="package-check" style="width: 24px; height: 24px;"></i>
+              </div>
+            </div>
+
+            <!-- Quick Search Input Line -->
+            <div class="manual-add-row mb-3">
+              <div class="input-icon-wrapper flex-1">
+                <i data-lucide="search" class="input-icon"></i>
+                <input type="text" id="input-search-part-kembali" placeholder="Cari No. Gudang / Kode Part / No. Reservasi..." autocomplete="off" />
+                <button id="btn-clear-search-part-kembali" class="btn-clear" title="Clear Search" style="display:none;">
+                  <i data-lucide="x"></i>
+                </button>
+              </div>
+            </div>
+
+            <!-- Part List Container -->
+            <div id="part-kembali-list-container" class="part-kembali-container" style="display: flex; flex-direction: column; gap: 6px;">
+              <div class="empty-state-sm">
+                <i data-lucide="loader-2" class="spin-lg"></i>
+                <p>Memuat data Part Belum Kembali...</p>
               </div>
             </div>
           </div>
@@ -346,20 +363,37 @@
             <div class="card-header">
               <div class="card-title" style="color: var(--warning);">
                 <i data-lucide="banknote"></i> Tagihan Teknisi
+                <span class="badge-count" id="tagihan-count">0 Invoice</span>
               </div>
             </div>
 
-            <div class="empty-state-card" style="padding: 40px 20px; text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px;">
-              <div class="not-available-icon" style="width: 64px; height: 64px; border-radius: 50%; background: rgba(245, 158, 11, 0.12); border: 2px dashed var(--warning); display: flex; align-items: center; justify-content: center; color: var(--warning); margin-bottom: 4px;">
-                <i data-lucide="lock" style="width: 28px; height: 28px;"></i>
+            <!-- Top Summary Box for Total Tagihan Rupiah -->
+            <div class="tagihan-summary-box mb-3" style="background: var(--bg-card); border-left: 4px solid var(--warning); padding: 12px 14px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); border-left: 4px solid var(--warning); display: flex; align-items: center; justify-content: space-between; gap: 12px; box-shadow: var(--shadow-main);">
+              <div>
+                <div style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">TOTAL TAGIHAN TEKNISI</div>
+                <div style="font-size: 22px; font-weight: 800; color: var(--warning); margin-top: 2px;" id="tagihan-total-jumlah">Rp 0</div>
               </div>
-              <h3 style="font-size: 1.1rem; font-weight: 800; color: var(--text-main); margin: 0;">BELUM TERSEDIA</h3>
-              <p style="font-size: 0.85rem; color: var(--text-muted); max-width: 300px; margin: 0; line-height: 1.5;">
-                Fitur <strong>Tagihan Teknisi</strong> saat ini belum tersedia (sedang dalam tahap pengembangan).
-              </p>
-              <div class="badge-status-info" style="display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px; border-radius: 4px; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--border-color); font-size: 0.78rem; color: var(--text-muted); margin-top: 8px;">
-                <i data-lucide="info" style="width: 14px; height: 14px; color: var(--warning);"></i>
-                <span>Informasi akan diperbarui setelah fitur aktif</span>
+              <div style="width: 44px; height: 44px; border-radius: 50%; background: rgba(245, 158, 11, 0.15); display: flex; align-items: center; justify-content: center; color: var(--warning); flex-shrink: 0;">
+                <i data-lucide="wallet" style="width: 24px; height: 24px;"></i>
+              </div>
+            </div>
+
+            <!-- Quick Search Input Line -->
+            <div class="manual-add-row mb-3">
+              <div class="input-icon-wrapper flex-1">
+                <i data-lucide="search" class="input-icon"></i>
+                <input type="text" id="input-search-tagihan" placeholder="Cari No. Invoice / Nama Konsumen..." autocomplete="off" />
+                <button id="btn-clear-search-tagihan" class="btn-clear" title="Clear Search" style="display:none;">
+                  <i data-lucide="x"></i>
+                </button>
+              </div>
+            </div>
+
+            <!-- Tagihan List Container -->
+            <div id="tagihan-list-container" class="tagihan-container" style="display: flex; flex-direction: column; gap: 8px;">
+              <div class="empty-state-sm">
+                <i data-lucide="loader-2" class="spin-lg"></i>
+                <p>Memuat data Tagihan Teknisi...</p>
               </div>
             </div>
           </div>

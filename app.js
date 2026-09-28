@@ -52,18 +52,26 @@ let state = {
   showTransferStok: false,
   transferProcessMode: 'STAFPART', // 'STAFPART' | 'HODS'
   // Google Sheets Data State
+  tagihanSearchQuery: '',
   sheetsData: {
-    lastUpdateTimestamp: 'Memuat...',
+    lastUpdateTimestamp: 'Memuat data....',
+    pendingTimestamp: 'Memuat data....',
+    performaTimestamp: 'Memuat data....',
+    partKembaliTimestamp: 'Memuat data....',
+    tagihanTimestamp: 'Memuat data....',
     lastSyncTime: null,
     pendingCases: [],
     insentifRows: [],
     rata2Rows: [],
     outputHariIni: [],
-    notifications: []
+    notifications: [],
+    partBelumKembali: [],
+    tagihanRows: []
   },
   sheetsPollTimer: null,
   isFetchingSheets: false,
   pendingSearchQuery: '',
+  partKembaliSearchQuery: '',
   // PIPO Part Pengganti State
   pipoData: [],
   isFetchingPipo: false,
@@ -162,6 +170,21 @@ const DOM = {
   btnRefreshNotif: document.getElementById('btn-refresh-notif'),
   notifTechCount: document.getElementById('notif-tech-count'),
   notifListContainer: document.getElementById('notif-list-container'),
+  
+  // Part Bekas Controls
+  inputSearchPartKembali: document.getElementById('input-search-part-kembali'),
+  btnClearSearchPartKembali: document.getElementById('btn-clear-search-part-kembali'),
+  partKembaliCount: document.getElementById('part-kembali-count'),
+  partKembaliTotalQty: document.getElementById('part-kembali-total-qty'),
+  partKembaliListContainer: document.getElementById('part-kembali-list-container'),
+
+  // Tagihan Controls
+  tagihanUpdateTimestamp: document.getElementById('tagihan-update-timestamp'),
+  tagihanCount: document.getElementById('tagihan-count'),
+  tagihanTotalJumlah: document.getElementById('tagihan-total-jumlah'),
+  inputSearchTagihan: document.getElementById('input-search-tagihan'),
+  btnClearSearchTagihan: document.getElementById('btn-clear-search-tagihan'),
+  tagihanListContainer: document.getElementById('tagihan-list-container'),
   
   // Dedicated Profile Display
   profDispNama: document.getElementById('prof-disp-nama'),
@@ -856,6 +879,44 @@ function setupEventListeners() {
     });
   }
 
+  if (DOM.inputSearchPartKembali) {
+    DOM.inputSearchPartKembali.addEventListener('input', (e) => {
+      state.partKembaliSearchQuery = e.target.value;
+      if (DOM.btnClearSearchPartKembali) {
+        DOM.btnClearSearchPartKembali.style.display = e.target.value ? 'block' : 'none';
+      }
+      renderPartKembaliTab();
+    });
+  }
+
+  if (DOM.btnClearSearchPartKembali) {
+    DOM.btnClearSearchPartKembali.addEventListener('click', () => {
+      state.partKembaliSearchQuery = '';
+      if (DOM.inputSearchPartKembali) DOM.inputSearchPartKembali.value = '';
+      DOM.btnClearSearchPartKembali.style.display = 'none';
+      renderPartKembaliTab();
+    });
+  }
+
+  if (DOM.inputSearchTagihan) {
+    DOM.inputSearchTagihan.addEventListener('input', (e) => {
+      state.tagihanSearchQuery = e.target.value;
+      if (DOM.btnClearSearchTagihan) {
+        DOM.btnClearSearchTagihan.style.display = e.target.value ? 'block' : 'none';
+      }
+      renderTagihanTab();
+    });
+  }
+
+  if (DOM.btnClearSearchTagihan) {
+    DOM.btnClearSearchTagihan.addEventListener('click', () => {
+      state.tagihanSearchQuery = '';
+      if (DOM.inputSearchTagihan) DOM.inputSearchTagihan.value = '';
+      DOM.btnClearSearchTagihan.style.display = 'none';
+      renderTagihanTab();
+    });
+  }
+
   // Camera Scanner Buttons
   DOM.btnToggleCamera.addEventListener('click', toggleScanner);
   if (DOM.btnToggleTorch) DOM.btnToggleTorch.addEventListener('click', toggleTorch);
@@ -1459,6 +1520,7 @@ function switchTab(targetTabId, pushState = true) {
     renderFinishHistory();
   }
 
+  renderSheetUpdateInfo();
   lucide.createIcons();
 }
 
@@ -3180,7 +3242,7 @@ function saveSheetsCache() {
   }
 }
 
-async function fetchGVizSheet(sheetName) {
+async function fetchGVizSheet(sheetName, range = 'A1:Z1000', noHeaders = false) {
   // Use JSONP dynamic script injection to bypass CORS policy restrictions completely
   try {
     return await new Promise((resolve, reject) => {
@@ -3206,7 +3268,8 @@ async function fetchGVizSheet(sheetName) {
 
       const script = document.createElement('script');
       script.id = callbackName;
-      script.src = `https://docs.google.com/spreadsheets/d/${GOOGLE_SHEET_ID}/gviz/tq?tqx=responseHandler:${callbackName}&sheet=${encodeURIComponent(sheetName)}&t=${Date.now()}`;
+      const headersParam = noHeaders ? '&headers=0' : '';
+      script.src = `https://docs.google.com/spreadsheets/d/${GOOGLE_SHEET_ID}/gviz/tq?tqx=responseHandler:${callbackName}&sheet=${encodeURIComponent(sheetName)}&range=${encodeURIComponent(range)}${headersParam}&t=${Date.now()}`;
       script.onerror = function(err) {
         clearTimeout(timeout);
         if (window[callbackName]) delete window[callbackName];
@@ -3217,7 +3280,8 @@ async function fetchGVizSheet(sheetName) {
     });
   } catch (jsonpErr) {
     // Fallback to fetch API if JSONP fails
-    const url = `https://docs.google.com/spreadsheets/d/${GOOGLE_SHEET_ID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(sheetName)}&t=${Date.now()}`;
+    const headersParam = noHeaders ? '&headers=0' : '';
+    const url = `https://docs.google.com/spreadsheets/d/${GOOGLE_SHEET_ID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(sheetName)}&range=${encodeURIComponent(range)}${headersParam}&t=${Date.now()}`;
     const res = await fetch(url);
     const text = await res.text();
     const jsonMatch = text.match(/google\.visualization\.Query\.setResponse\(([\s\S]*)\);?/);
@@ -3247,29 +3311,68 @@ async function fetchGoogleSheetsData() {
   if (DOM.syncIcon) DOM.syncIcon.classList.add('spinning');
 
   try {
-    const [tableData, tableNotif] = await Promise.all([
-      fetchGVizSheet('DATA'),
-      fetchGVizSheet('NOTIF')
+    const [tableData, tableNotif, tableZ2, tablePartKembali, tableAG, tableTagihan] = await Promise.all([
+      fetchGVizSheet('DATA', 'A1:Z1000'),
+      fetchGVizSheet('NOTIF', 'A1:J1000'),
+      fetchGVizSheet('DATA', 'Z1:Z10', true),
+      fetchGVizSheet('DATA', 'AC1:AF1000', true),
+      fetchGVizSheet('DATA', 'AG1:AG10', true),
+      fetchGVizSheet('DATA', 'AI1:AL1000', true)
     ]);
 
     const rowsData = extractMatrixFromGViz(tableData);
     const rowsNotif = extractMatrixFromGViz(tableNotif);
+    const rowsPartKembali = extractMatrixFromGViz(tablePartKembali);
+    const rowsTagihan = extractMatrixFromGViz(tableTagihan);
 
     const techName = state.profile.nama || '';
     const techNik = state.profile.nik || '';
 
-    // 1. Timestamp Z2 (Col index 25, Row index 1 = cell Z2)
-    let lastUpdateStr = '';
-    if (rowsData.length > 1 && rowsData[1][25]) {
-      lastUpdateStr = rowsData[1][25];
-    } else if (rowsData.length > 0 && rowsData[0][25]) {
-      lastUpdateStr = rowsData[0][25];
+    // 1. Pending Timestamp (Cell Z2)
+    let pendingTimestamp = '';
+    if (tableZ2 && tableZ2.rows) {
+      for (let r = 0; r < tableZ2.rows.length; r++) {
+        const row = tableZ2.rows[r];
+        if (row && row.c && row.c[0]) {
+          const val = (row.c[0].v || row.c[0].f || '').toString().trim();
+          if (val && val.toUpperCase() !== 'KODE NOTIF' && val.length > 2) {
+            pendingTimestamp = val;
+            break;
+          }
+        }
+      }
     }
-    
-    if (!lastUpdateStr || lastUpdateStr.length < 3) {
-      const now = new Date();
-      lastUpdateStr = now.toLocaleDateString('id-ID') + ' ' + now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+    if (!pendingTimestamp || pendingTimestamp.length < 3) pendingTimestamp = 'Memuat data....';
+
+    // 1b. Performa Timestamp (Cell AG3 -> row index 2)
+    let performaTimestamp = '';
+    if (tableAG && tableAG.rows && tableAG.rows.length >= 3) {
+      const row3 = tableAG.rows[2];
+      if (row3 && row3.c && row3.c[0]) {
+        performaTimestamp = (row3.c[0].v || row3.c[0].f || '').toString().trim();
+      }
     }
+    if (!performaTimestamp || performaTimestamp.length < 3) performaTimestamp = 'Memuat data....';
+
+    // 1c. Part Bekas Belum Kembali Timestamp (Cell AG5 -> row index 4)
+    let partKembaliTimestamp = '';
+    if (tableAG && tableAG.rows && tableAG.rows.length >= 5) {
+      const row5 = tableAG.rows[4];
+      if (row5 && row5.c && row5.c[0]) {
+        partKembaliTimestamp = (row5.c[0].v || row5.c[0].f || '').toString().trim();
+      }
+    }
+    if (!partKembaliTimestamp || partKembaliTimestamp.length < 3) partKembaliTimestamp = 'Memuat data....';
+
+    // 1d. Tagihan Timestamp (Cell AG6 -> row index 5)
+    let tagihanTimestamp = '';
+    if (tableAG && tableAG.rows && tableAG.rows.length >= 6) {
+      const row6 = tableAG.rows[5];
+      if (row6 && row6.c && row6.c[0]) {
+        tagihanTimestamp = (row6.c[0].v || row6.c[0].f || '').toString().trim();
+      }
+    }
+    if (!tagihanTimestamp || tagihanTimestamp.length < 3) tagihanTimestamp = 'Memuat data....';
 
     // 2. Pending Cases (Cols A-J, indices 0-9, Row 1+)
     // Col 0: TGL, 1: NO SCL, 2: TYPE, 3: SERI, 4: LAYANAN, 5: STOK IN, 6: STATUS, 7: TEKNISI (COL H), 8: KET PART, 9: USIA
@@ -3379,15 +3482,61 @@ async function fetchGoogleSheetsData() {
       }
     }
 
+    // 7. Part Bekas (Sheet DATA, Range AC1:AF, 0: No Gudang, 1: Qty, 2: Nama Teknisi, 3: No Reservasi)
+    const partBelumKembali = [];
+    for (let r = 0; r < rowsPartKembali.length; r++) {
+      const row = rowsPartKembali[r];
+      if (!row || row.length < 3) continue;
+      const noGudang = (row[0] || '').trim();
+      const qtyVal = (row[1] || '').trim();
+      const techNameRow = (row[2] || '').trim();
+      const noReservasi = (row[3] || '').trim();
+
+      if (noGudang && noGudang.toUpperCase() !== 'PART' && techNameRow && matchTechName(techNameRow, techName, techNik)) {
+        partBelumKembali.push({
+          noGudang: noGudang,
+          qty: qtyVal || '1',
+          teknisi: techNameRow,
+          noReservasi: (noReservasi && noReservasi.toUpperCase() !== 'NONE') ? noReservasi : ''
+        });
+      }
+    }
+
+    // 8. Tagihan Rows (Sheet DATA, Range AI1:AL1000, 0: NO INVOICE, 1: NAMA TEKNISI, 2: JUMLAH, 3: NAMA KONSUMEN)
+    const tagihanRows = [];
+    for (let r = 0; r < rowsTagihan.length; r++) {
+      const row = rowsTagihan[r];
+      if (!row || row.length < 4) continue;
+      const noInvoice = (row[0] || '').trim();
+      const techNameRow = (row[1] || '').trim();
+      const jumlahVal = (row[2] || '').trim();
+      const namaKonsumen = (row[3] || '').trim();
+
+      if (noInvoice && noInvoice.toUpperCase() !== 'NO INVOICE' && techNameRow && matchTechName(techNameRow, techName, techNik)) {
+        tagihanRows.push({
+          noInvoice: noInvoice,
+          teknisi: techNameRow,
+          jumlah: jumlahVal || '0',
+          namaKonsumen: namaKonsumen || '-'
+        });
+      }
+    }
+
     // Update state & single source of truth cache
     state.sheetsData = {
-      lastUpdateTimestamp: lastUpdateStr,
+      lastUpdateTimestamp: pendingTimestamp,
+      pendingTimestamp,
+      performaTimestamp,
+      partKembaliTimestamp,
+      tagihanTimestamp,
       lastSyncTime: Date.now(),
       pendingCases,
       insentifRows,
       rata2Rows,
       outputHariIni,
-      notifications
+      notifications,
+      partBelumKembali,
+      tagihanRows
     };
 
     saveSheetsCache();
@@ -3419,12 +3568,24 @@ function renderAllSheetsViews() {
   renderPendingTab();
   renderPerformaTab();
   renderNotifTab();
+  renderPartKembaliTab();
+  renderTagihanTab();
   updateBadges();
 }
 
 function renderSheetUpdateInfo() {
+  const pendingTs = state.sheetsData.pendingTimestamp || state.sheetsData.lastUpdateTimestamp || 'Memuat data....';
+  const performaTs = state.sheetsData.performaTimestamp || 'Memuat data....';
+  const partKembaliTs = state.sheetsData.partKembaliTimestamp || 'Memuat data....';
+  const tagihanTs = state.sheetsData.tagihanTimestamp || 'Memuat data....';
+
+  let activeTs = pendingTs;
+  if (state.activeTab === 'tab-performa') activeTs = performaTs;
+  else if (state.activeTab === 'tab-part-kembali') activeTs = partKembaliTs;
+  else if (state.activeTab === 'tab-tagihan') activeTs = tagihanTs;
+
   if (DOM.sheetZ2Timestamp) {
-    DOM.sheetZ2Timestamp.textContent = state.sheetsData.lastUpdateTimestamp || 'Live System';
+    DOM.sheetZ2Timestamp.textContent = activeTs;
   }
 }
 
@@ -3654,6 +3815,131 @@ function renderNotifTab() {
       </div>
       ${item.ket_part ? `<div style="font-size:10px;color:var(--warning);font-weight:600;"><i data-lucide="info" style="width:11px;height:11px;display:inline;"></i> ${item.ket_part}</div>` : ''}
     </div>`).join('');
+
+  lucide.createIcons();
+}
+
+function renderPartKembaliTab() {
+  if (!DOM.partKembaliListContainer) return;
+  const list = state.sheetsData.partBelumKembali || [];
+  const searchQ = (state.partKembaliSearchQuery || '').trim().toUpperCase();
+
+  const filtered = list.filter(item => {
+    if (!searchQ) return true;
+    return (
+      (item.noGudang || '').toUpperCase().includes(searchQ) ||
+      (item.noReservasi || '').toUpperCase().includes(searchQ)
+    );
+  });
+
+  const totalQty = filtered.reduce((acc, item) => {
+    const q = parseFloat(item.qty) || 1;
+    return acc + q;
+  }, 0);
+
+  if (DOM.partKembaliTotalQty) {
+    DOM.partKembaliTotalQty.textContent = `${totalQty} Pcs`;
+  }
+  if (DOM.partKembaliCount) {
+    DOM.partKembaliCount.textContent = `${filtered.length} Item`;
+  }
+
+  if (filtered.length === 0) {
+    DOM.partKembaliListContainer.innerHTML = `
+      <div class="empty-state-sm" style="padding: 24px 10px;">
+        <i data-lucide="package-open" style="width:36px; height:36px; color:var(--text-muted);"></i>
+        <p style="font-weight:600; color:var(--text-muted); margin-top:4px;">${searchQ ? 'Tidak ada part yang cocok dengan pencarian.' : 'Tidak ada Part Bekas untuk Anda.'}</p>
+        <span style="font-size:10.5px; color:var(--text-dark);">Semua part bekas telah diproses.</span>
+      </div>`;
+    lucide.createIcons();
+    return;
+  }
+
+  DOM.partKembaliListContainer.innerHTML = filtered.map(item => `
+    <div class="card-item-part-kembali" style="background:var(--bg-input); border:1px solid var(--border-color); border-radius:var(--radius-sm); padding:10px 12px; display:flex; flex-direction:column; gap:4px;">
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
+        <div style="display:flex; align-items:center; gap:10px; flex:1; min-width:0;">
+          <div style="width:30px; height:30px; border-radius:var(--radius-sm); background:var(--primary-light); color:var(--primary); display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+            <i data-lucide="package" style="width:15px; height:15px;"></i>
+          </div>
+          <div style="flex:1; min-width:0;">
+            <div style="font-size:13px; font-weight:800; color:var(--text-main); word-break:break-all;">${escapeHtml(item.noGudang)}</div>
+          </div>
+        </div>
+        <div style="flex-shrink:0;">
+          <span style="font-size:11.5px; font-weight:800; color:var(--primary); background:rgba(16, 185, 129, 0.15); padding:3px 8px; border-radius:var(--radius-sm); border:1px solid rgba(16, 185, 129, 0.3); display:inline-block;">
+            Qty: ${escapeHtml(item.qty)}
+          </span>
+        </div>
+      </div>
+      ${item.noReservasi ? `
+      <div style="font-size:10.5px; color:var(--primary); font-weight:700; word-break:break-all; padding-left:40px; margin-top:1px;">
+        <i data-lucide="bookmark" style="width:10.5px;height:10.5px;display:inline;"></i> ${escapeHtml(item.noReservasi)}
+      </div>` : ''}
+    </div>
+  `).join('');
+
+  lucide.createIcons();
+}
+
+function renderTagihanTab() {
+  if (!DOM.tagihanListContainer) return;
+  const list = state.sheetsData.tagihanRows || [];
+  const searchQ = (state.tagihanSearchQuery || '').trim().toUpperCase();
+
+  const filtered = list.filter(item => {
+    if (!searchQ) return true;
+    return (
+      (item.noInvoice || '').toUpperCase().includes(searchQ) ||
+      (item.namaKonsumen || '').toUpperCase().includes(searchQ) ||
+      (item.jumlah || '').toString().includes(searchQ)
+    );
+  });
+
+  const totalJumlah = filtered.reduce((acc, item) => {
+    let cleanVal = String(item.jumlah).replace(/[^0-9.-]/g, '');
+    const parsed = parseFloat(cleanVal) || 0;
+    return acc + parsed;
+  }, 0);
+
+  if (DOM.tagihanTotalJumlah) {
+    DOM.tagihanTotalJumlah.textContent = formatRupiah(totalJumlah);
+  }
+  if (DOM.tagihanCount) {
+    DOM.tagihanCount.textContent = `${filtered.length} Invoice`;
+  }
+
+  if (filtered.length === 0) {
+    DOM.tagihanListContainer.innerHTML = `
+      <div class="empty-state-sm" style="padding: 24px 10px;">
+        <i data-lucide="receipt" style="width:36px; height:36px; color:var(--text-muted);"></i>
+        <p style="font-weight:600; color:var(--text-muted); margin-top:4px;">${searchQ ? 'Tidak ada tagihan yang cocok dengan pencarian.' : 'Tidak ada Tagihan untuk Anda.'}</p>
+        <span style="font-size:10.5px; color:var(--text-dark);">Semua invoice tagihan telah diproses.</span>
+      </div>`;
+    lucide.createIcons();
+    return;
+  }
+
+  DOM.tagihanListContainer.innerHTML = filtered.map(item => `
+    <div class="card-item-tagihan" style="background:var(--bg-input); border:1px solid var(--border-color); border-radius:var(--radius-sm); padding:10px 12px; display:flex; align-items:center; justify-content:space-between; gap:10px;">
+      <div style="display:flex; align-items:center; gap:10px; flex:1; min-width:0;">
+        <div style="width:34px; height:34px; border-radius:var(--radius-sm); background:rgba(245, 158, 11, 0.15); color:var(--warning); display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+          <i data-lucide="file-text" style="width:18px; height:18px;"></i>
+        </div>
+        <div style="flex:1; min-width:0;">
+          <div style="font-size:10.5px; font-weight:700; color:var(--text-main); word-break:break-all;">${escapeHtml(item.noInvoice)}</div>
+          <div style="font-size:11px; color:var(--text-muted); margin-top:2px;">
+            <i data-lucide="user" style="width:11px; height:11px; display:inline;"></i> Konsumen: <strong style="color:var(--text-main);">${escapeHtml(item.namaKonsumen)}</strong>
+          </div>
+        </div>
+      </div>
+      <div style="display:flex; align-items:center; flex-shrink:0;">
+        <span style="font-size:12px; font-weight:800; color:var(--warning); background:rgba(245, 158, 11, 0.15); padding:5px 10px; border-radius:var(--radius-sm); border:1px solid rgba(245, 158, 11, 0.3);">
+          ${formatRupiah(item.jumlah)}
+        </span>
+      </div>
+    </div>
+  `).join('');
 
   lucide.createIcons();
 }
