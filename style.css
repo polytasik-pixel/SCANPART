@@ -2765,25 +2765,49 @@ input:checked + .slider:before { transform: translateX(20px); }
 
 .finish-stat-box {
   background: var(--bg-input);
-  padding: 5px 6px;
+  padding: 6px 4px;
   border-radius: var(--radius-sm);
   text-align: center;
-  border: 1px solid rgba(255,255,255,0.03);
+  border: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: center;
+  height: 52px;
+  min-height: 52px;
+  box-sizing: border-box;
 }
 
 .finish-stat-box label {
-  display: block;
-  font-size: 9px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  font-size: 8.5px;
   font-weight: 700;
   color: var(--text-muted);
   text-transform: uppercase;
-  margin-bottom: 1px;
+  height: 24px;
+  min-height: 24px;
+  max-height: 24px;
+  line-height: 1.15;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
 }
 
 .finish-stat-box strong {
-  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
   font-weight: 800;
   color: var(--text-main);
+  height: 18px;
+  line-height: 1;
+  width: 100%;
+  margin: 0;
 }
 
 
