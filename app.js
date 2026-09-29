@@ -252,6 +252,8 @@ const DOM = {
   // History
   historyList: document.getElementById('history-list'),
   btnClearHistory: document.getElementById('btn-clear-history'),
+  btnRefreshHistory: document.getElementById('btn-refresh-history'),
+  syncIconHistory: document.getElementById('sync-icon-history'),
 
   // Admin User Management & App Settings
   adminTransferStokToggle: document.getElementById('admin-transfer-stok-toggle'),
@@ -1105,8 +1107,21 @@ function setupEventListeners() {
     });
   }
 
-  // Clear History
+  // Clear & Refresh History
   if (DOM.btnClearHistory) DOM.btnClearHistory.addEventListener('click', openClearHistoryConfirmModal);
+  if (DOM.btnRefreshHistory) {
+    DOM.btnRefreshHistory.addEventListener('click', async () => {
+      const activeIcon = document.getElementById('sync-icon-history') || DOM.syncIconHistory;
+      if (activeIcon) activeIcon.classList.add('spinning');
+      showToast('🔄 Memperbarui riwayat...', 'info');
+      try {
+        await renderHistory();
+      } finally {
+        const icon = document.getElementById('sync-icon-history') || DOM.syncIconHistory;
+        if (icon) icon.classList.remove('spinning');
+      }
+    });
+  }
 
   // Admin User Management Listeners
   if (DOM.btnOpenAddUser) DOM.btnOpenAddUser.addEventListener('click', openAddUserModal);
@@ -2253,7 +2268,82 @@ function saveProfileSilently() {
 // ==========================================
 // HISTORY RENDERER
 // ==========================================
-function renderHistory() {
+async function renderHistory() {
+  if (!DOM.historyList) return;
+
+  if (state.isAdmin && state.supabaseClient) {
+    DOM.historyList.innerHTML = `
+      <div class="empty-state-sm">
+        <i data-lucide="loader-2" class="spin-lg"></i>
+        <p>Memuat seluruh riwayat transfer stok dari Supabase...</p>
+      </div>`;
+    lucide.createIcons();
+
+    try {
+      const { data, error } = await state.supabaseClient
+        .from(SUPABASE_CONFIG.table)
+        .select('id, created_at, no_gudang, qty, nama_teknisi, teknisi_nik, status')
+        .order('created_at', { ascending: false })
+        .limit(300);
+
+      if (error) throw error;
+
+      if (!data || data.length === 0) {
+        DOM.historyList.innerHTML = `
+          <div class="empty-state-sm">
+            <i data-lucide="inbox"></i>
+            <p>Belum ada data transaksi transfer stok di Supabase.</p>
+          </div>`;
+        lucide.createIcons();
+        return;
+      }
+
+      DOM.historyList.innerHTML = data.map(item => {
+        let dateFormatted = '-';
+        if (item.created_at) {
+          try {
+            const dt = new Date(item.created_at);
+            const datePart = dt.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' });
+            const timePart = dt.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+            dateFormatted = `${datePart}, ${timePart}`;
+          } catch(e) {
+            dateFormatted = String(item.created_at);
+          }
+        }
+
+        const teknisiName = item.nama_teknisi || item.teknisi_nik || 'Teknisi';
+        const partName = item.no_gudang || '-';
+        const qtyVal = (item.qty !== undefined && item.qty !== null) ? item.qty : 1;
+
+        return `
+          <div class="history-item">
+            <div style="flex: 1; padding-right: 8px;">
+              <div class="item-gudang" style="font-weight: 700; font-size: 12.5px; color: var(--text-main);">${escapeHtml(partName)}</div>
+              <div class="item-meta" style="font-size: 10.5px; color: var(--text-muted); margin-top: 3px;">
+                <span style="color: var(--primary); font-weight: 700;">${escapeHtml(teknisiName)}</span> • ${dateFormatted}
+              </div>
+            </div>
+            <div style="text-align: right; flex-shrink: 0;">
+              <span class="item-qty-plain" style="font-weight: 800; font-size: 11.5px; color: var(--primary); background: var(--primary-light); padding: 3px 8px; border-radius: 4px;">Qty: ${qtyVal}</span>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      lucide.createIcons();
+    } catch (err) {
+      console.error('Error fetching Supabase history for Admin:', err);
+      DOM.historyList.innerHTML = `
+        <div class="empty-state-sm">
+          <i data-lucide="alert-circle" class="text-danger"></i>
+          <p>Gagal memuat riwayat Supabase: ${escapeHtml(err.message)}</p>
+        </div>`;
+      lucide.createIcons();
+    }
+    return;
+  }
+
+  // Non-Admin Technician Local History View
   if (!state.history || state.history.length === 0) {
     DOM.historyList.innerHTML = `
       <div class="empty-state-sm">
@@ -2265,13 +2355,18 @@ function renderHistory() {
   }
 
   DOM.historyList.innerHTML = state.history.map(item => {
-    const timeFormatted = new Date(item.created_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+    let timeFormatted = '-';
+    if (item.created_at) {
+      try {
+        timeFormatted = new Date(item.created_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+      } catch(e) {}
+    }
 
     return `
       <div class="history-item">
         <div>
           <div class="item-gudang">${escapeHtml(item.no_gudang)}</div>
-          <div class="item-meta">${escapeHtml(item.nama_teknisi)} • ${timeFormatted}</div>
+          <div class="item-meta">${escapeHtml(item.nama_teknisi || state.profile.nama)} • ${timeFormatted}</div>
         </div>
         <span class="item-qty-plain">Qty: ${item.qty}</span>
       </div>

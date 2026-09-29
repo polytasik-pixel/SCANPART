@@ -22,7 +22,7 @@
   <!-- App Favicon (Part Box & Laser Scanner Icon) -->
   <link rel="icon" type="image/svg+xml" href="favicon.svg" />
 
-  <link rel="stylesheet" href="style.css?v=20.0" />
+  <link rel="stylesheet" href="style.css?v=21.0" />
   <script>
     window.__INIT_NAMA__ = '';
     window.__INIT_NIK__ = '';
@@ -496,13 +496,18 @@
         <!-- TAB 5: RIWAYAT / STATUS LOGS -->
         <section id="tab-history" class="tab-content">
           <div class="card">
-            <div class="card-header">
+            <div class="card-header flex-between align-center">
               <div class="card-title">
                 <i data-lucide="history"></i> Riwayat Submit Data
               </div>
-              <button id="btn-clear-history" class="btn-icon text-danger" title="Hapus Riwayat">
-                <i data-lucide="trash-2"></i>
-              </button>
+              <div style="display: flex; align-items: center; gap: 6px;">
+                <button type="button" id="btn-refresh-history" class="btn btn-ghost btn-xs" style="font-size: 11px; font-weight: 700; gap: 4px; padding: 4px 8px; border-radius: 4px;" title="Refresh Data Riwayat">
+                  <i data-lucide="refresh-cw" id="sync-icon-history"></i> Refresh
+                </button>
+                <button type="button" id="btn-clear-history" class="btn-icon text-danger" title="Hapus Riwayat">
+                  <i data-lucide="trash-2"></i>
+                </button>
+              </div>
             </div>
             <div id="history-list" class="history-container">
               <div class="empty-state-sm">
