@@ -709,6 +709,17 @@ html[data-active-tab="tab-profile"] .nav-item[data-target="tab-profile"] svg {
   margin-top: 4px;
 }
 
+.logout-wrapper .btn {
+  padding: 12px 18px !important;
+  min-height: 44px !important;
+  font-size: 12.5px !important;
+  font-weight: 700 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 8px !important;
+}
+
 /* ==========================================
    DEDICATED PROFILE SCREEN (SCROLLABLE ON PC & MOBILE)
    ========================================== */
@@ -3355,15 +3366,11 @@ input:checked + .slider:before { transform: translateX(20px); }
     gap: 12px !important;
   }
 
-  .btn-logout-danger, .btn-logout-danger i, .btn-logout-danger svg {
-    background-color: #ef4444 !important;
-    color: #ffffff !important;
-    stroke: #ffffff !important;
+  .logout-wrapper .btn {
+    padding: 12px 18px !important;
+    min-height: 44px !important;
+    font-size: 12.5px !important;
     font-weight: 700 !important;
-  }
-
-  .btn-logout-danger:hover {
-    background-color: #dc2626 !important;
   }
 
   /* 11. Modals */
