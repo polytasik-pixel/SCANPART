@@ -22,7 +22,7 @@
   <!-- App Favicon (Part Box & Laser Scanner Icon) -->
   <link rel="icon" type="image/svg+xml" href="favicon.svg" />
 
-  <link rel="stylesheet" href="style.css?v=21.0" />
+  <link rel="stylesheet" href="style.css?v=28.0" />
   <script>
     window.__INIT_NAMA__ = '';
     window.__INIT_NIK__ = '';
@@ -50,7 +50,8 @@
           }
           var hashTab = window.location.hash ? window.location.hash.replace('#', '') : '';
           var savedTab = localStorage.getItem('teknisi_last_active_tab');
-          var savedMode = localStorage.getItem('teknisi_last_active_mode') || 'teknisi';
+          var savedMode = localStorage.getItem('teknisi_last_active_mode');
+          if (!savedMode || savedMode === 'menu') savedMode = 'teknisi';
           var validTabs = ['tab-menu', 'tab-scan', 'tab-history', 'tab-pending', 'tab-performa', 'tab-notif', 'tab-part-kembali', 'tab-tagihan', 'tab-pipo', 'tab-finish', 'tab-finish-all', 'tab-profile'];
           if (isAdmin) validTabs.push('tab-users');
           var activeTab = (hashTab && validTabs.indexOf(hashTab) !== -1) ? hashTab : ((savedTab && validTabs.indexOf(savedTab) !== -1) ? savedTab : 'tab-menu');
@@ -107,7 +108,8 @@
             <div class="form-group">
               <label for="login-password">Password</label>
               <div class="input-icon-wrapper">
-                <input type="password" id="login-password" placeholder="Password akun..." required style="padding-left:12px;" />
+                <i data-lucide="key" class="input-icon"></i>
+                <input type="password" id="login-password" placeholder="Password akun..." required />
                 <button type="button" id="btn-login-psw-toggle" class="btn-clear" title="Lihat Password">
                   <i data-lucide="eye" id="login-psw-eye"></i>
                 </button>
@@ -151,6 +153,12 @@
           </div>
           <button type="button" id="header-btn-missing" class="header-psw-badge" style="background:var(--primary); border:1px solid rgba(255,255,255,0.4);" title="Cek tanggal laporan yang belum diisi">
             <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-calendar"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg> <span>Cek Tanggal Belum Isi</span>
+          </button>
+          <button type="button" id="header-btn-users" class="header-psw-badge admin-only hidden" style="background:rgba(255,255,255,0.18); border:1px solid rgba(255,255,255,0.4); cursor:pointer;" title="Kelola / Pengaturan User (Admin Only)">
+            <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-users"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg> <span>Pengaturan User</span>
+          </button>
+          <button type="button" id="header-btn-profile" class="header-psw-badge" style="background:rgba(255,255,255,0.22); border:1px solid rgba(255,255,255,0.4); cursor:pointer; padding: 5px 8px;" title="Buka Halaman Akun / Profil">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-user-cog"><circle cx="18" cy="15" r="3"/><circle cx="9" cy="7" r="4"/><path d="M10 15H6a4 4 0 0 0-4 4v2"/><path d="m21.7 16.4-.9-.3"/><path d="m15.2 13.9-.9-.3"/><path d="m16.4 21.7-.3-.9"/><path d="m13.9 15.2-.3-.9"/><path d="m21.7 13.6-.9.3"/><path d="m15.2 16.1-.9.3"/><path d="m13.9 14.8-.3.9"/><path d="m16.4 8.3-.3.9"/></svg>
           </button>
         </div>
       </header>
@@ -712,12 +720,21 @@
                 </div>
               </div>
 
-              <!-- Tombol Logout (Desktop Left Column) -->
-              <div class="logout-wrapper desktop-only">
-                <button type="button" id="btn-logout" class="btn btn-secondary btn-block">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-log-out"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></svg>
-                  <span>KELUAR AKUN (LOGOUT)</span>
-                </button>
+              <!-- Card Gabungan Pembersihan Cache & Logout -->
+              <div class="card account-actions-card">
+                <div class="card-title mb-2" style="font-size: 13px; font-weight: 700;">
+                  <i data-lucide="shield-alert"></i> Tindakan Akun & Cache
+                </div>
+                <div class="account-actions-group" style="display: flex; flex-direction: column; gap: 10px;">
+                  <button type="button" id="btn-clear-app-cache" class="btn btn-ghost btn-block btn-sm" style="font-size: 11px; font-weight: 700; gap: 6px; color: var(--warning); border-color: var(--warning); padding: 9px 10px; border-radius: 6px;">
+                    <i data-lucide="trash-2"></i>
+                    <span>HAPUS CACHE APLIKASI</span>
+                  </button>
+                  <button type="button" id="btn-logout" class="btn btn-secondary btn-block" style="height: 44px; border-radius: 6px;">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-log-out"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></svg>
+                    <span>KELUAR AKUN (LOGOUT)</span>
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -730,6 +747,14 @@
                 </div>
 
                 <form id="form-profile" onsubmit="return false;">
+                  <div class="form-group mb-2">
+                    <label for="profile-area">Area Kerja / Operasional</label>
+                    <div class="input-icon-wrapper">
+                      <i data-lucide="map-pin" class="input-icon"></i>
+                      <input type="text" id="profile-area" value="Tasikmalaya" readonly title="Area operasional teknisi" />
+                    </div>
+                  </div>
+
                   <div class="form-group mb-2">
                     <label for="profile-nama">Nama Teknisi</label>
                     <div class="input-icon-wrapper">
@@ -749,7 +774,8 @@
                   <div class="form-group mb-2">
                     <label for="profile-psw">Password Akses Web Target</label>
                     <div class="input-icon-wrapper">
-                      <input type="password" id="profile-psw" placeholder="Password akun..." readonly title="Pengubahan Password hanya melalui halaman Kelola User" style="padding-left:12px;" />
+                      <i data-lucide="key" class="input-icon"></i>
+                      <input type="password" id="profile-psw" placeholder="Password akun..." readonly title="Pengubahan Password hanya melalui halaman Kelola User" />
                       <button type="button" id="btn-toggle-psw-visibility" class="btn-clear" title="Lihat Password">
                         <i data-lucide="eye" id="psw-eye-icon"></i>
                       </button>
@@ -758,13 +784,7 @@
                 </form>
               </div>
 
-              <!-- Tombol Logout (Mobile Bottom) -->
-              <div class="logout-wrapper mobile-only">
-                <button type="button" class="btn btn-secondary btn-block" onclick="document.getElementById('btn-logout').click()">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-log-out"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></svg>
-                  <span>KELUAR AKUN (LOGOUT)</span>
-                </button>
-              </div>
+
             </div>
           </div>
         </section>
@@ -817,48 +837,44 @@
         <!-- TAB 7: KELOLA USER (KHUSUS ADMIN) -->
         <section id="tab-users" class="tab-content">
           <!-- PENGATURAN MODUL & MENU APLIKASI (ADMIN) -->
-          <div class="card card-admin-settings mb-4">
+          <div class="card card-admin-settings mb-2">
             <div class="card-header flex-between">
               <div class="card-title">
                 <i data-lucide="sliders"></i> Pengaturan Modul & Menu Aplikasi
               </div>
             </div>
-            <div class="card-body" style="padding: 12px 14px;">
-              <div class="switch-card" style="margin-bottom: 0;">
-                <div class="switch-info">
-                  <div class="switch-label">
-                    <i data-lucide="qr-code"></i> TAMPILKAN MENU TRANSFER STOK
-                  </div>
-                  <div class="switch-subtext">Sembunyikan / tampilkan menu Transfer Stok di semua perangkat teknisi (Realtime: True / False)</div>
+            <div class="switch-card" style="margin-bottom: 0;">
+              <div class="switch-info">
+                <div class="switch-label">
+                  <i data-lucide="qr-code"></i> TAMPILKAN MENU TRANSFER STOK
                 </div>
-                <label class="toggle-switch">
-                  <input type="checkbox" id="admin-transfer-stok-toggle" checked />
-                  <span class="slider"></span>
-                </label>
+                <div class="switch-subtext">Sembunyikan / tampilkan menu Transfer Stok di semua perangkat teknisi (Realtime: True / False)</div>
               </div>
+              <label class="toggle-switch">
+                <input type="checkbox" id="admin-transfer-stok-toggle" checked />
+                <span class="slider"></span>
+              </label>
             </div>
           </div>
 
           <!-- PENGATURAN MODE PROSES TRANSFER (KHUSUS MUNCUL JIKA TRANSFER STOK TERLIHAT) -->
-          <div id="admin-process-mode-container" class="card card-admin-settings mb-4" style="display: none;">
+          <div id="admin-process-mode-container" class="card card-admin-settings mb-2" style="display: none;">
             <div class="card-header flex-between">
               <div class="card-title">
                 <i data-lucide="cpu"></i> Mode Proses Transfer Stok (STAFPART / HODS)
               </div>
             </div>
-            <div class="card-body" style="padding: 12px 14px;">
-              <div class="switch-card" style="margin-bottom: 0;">
-                <div class="switch-info">
-                  <div class="switch-label">
-                    <i data-lucide="layers"></i> MODE PENGERJAAN: <strong id="admin-process-mode-label" style="color:var(--primary); font-weight: 800;">STAFPART</strong>
-                  </div>
-                  <div class="switch-subtext" id="admin-process-mode-desc">STAFPART: Memerlukan pilihan dropdown SKM / HIT saat pengerjaan stok.</div>
+            <div class="switch-card" style="margin-bottom: 0;">
+              <div class="switch-info">
+                <div class="switch-label">
+                  <i data-lucide="layers"></i> MODE PENGERJAAN: <strong id="admin-process-mode-label" style="color:var(--primary); font-weight: 800;">STAFPART</strong>
                 </div>
-                <label class="toggle-switch">
-                  <input type="checkbox" id="admin-process-mode-toggle" />
-                  <span class="slider"></span>
-                </label>
+                <div class="switch-subtext" id="admin-process-mode-desc">STAFPART: Memerlukan pilihan dropdown SKM / HIT saat pengerjaan stok.</div>
               </div>
+              <label class="toggle-switch">
+                <input type="checkbox" id="admin-process-mode-toggle" />
+                <span class="slider"></span>
+              </label>
             </div>
           </div>
 
@@ -930,14 +946,7 @@
           <span>Pengganti</span>
         </button>
 
-        <button class="nav-item" data-target="tab-profile" data-mode="all">
-          <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-user-cog"><circle cx="18" cy="15" r="3"/><circle cx="9" cy="7" r="4"/><path d="M10 15H6a4 4 0 0 0-4 4v2"/><path d="m21.7 16.4-.9-.3"/><path d="m15.2 13.9-.9-.3"/><path d="m16.4 21.7-.3-.9"/><path d="m13.9 15.2-.3-.9"/><path d="m21.7 13.6-.9.3"/><path d="m15.2 16.1-.9.3"/><path d="m13.9 14.8-.3.9"/><path d="m16.4 8.3-.3.9"/></svg>
-          <span>Profil</span>
-        </button>
-        <button class="nav-item admin-only hidden" id="nav-item-users" data-target="tab-users" data-mode="all">
-          <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-users"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-          <span>User</span>
-        </button>
+
       </nav>
 
     </div>
@@ -1056,7 +1065,8 @@
             <div class="form-group">
               <label for="user-form-psw">Password Akses Web Target</label>
               <div class="input-icon-wrapper">
-                <input type="text" id="user-form-psw" placeholder="Password akun..." required style="padding-left:12px;" />
+                <i data-lucide="key" class="input-icon"></i>
+                <input type="text" id="user-form-psw" placeholder="Password akun..." required />
               </div>
             </div>
 

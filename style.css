@@ -220,29 +220,24 @@ html[data-active-tab="tab-pending"] .nav-item[data-mode="teknisi"],
 html[data-active-tab="tab-performa"] .nav-item[data-mode="teknisi"],
 html[data-active-tab="tab-notif"] .nav-item[data-mode="teknisi"],
 html[data-active-tab="tab-part-kembali"] .nav-item[data-mode="teknisi"],
-html[data-active-tab="tab-tagihan"] .nav-item[data-mode="teknisi"],
-html[data-active-tab="tab-profile"][data-current-mode="teknisi"] .nav-item[data-mode="teknisi"],
-html[data-active-tab="tab-profile"]:not([data-current-mode]) .nav-item[data-mode="teknisi"] {
+html[data-active-tab="tab-tagihan"] .nav-item[data-mode="teknisi"] {
   display: flex !important;
 }
 
 /* Mode Scan Nav Items */
 html[data-active-tab="tab-scan"] .nav-item[data-mode="scan"],
-html[data-active-tab="tab-history"] .nav-item[data-mode="scan"],
-html[data-active-tab="tab-profile"][data-current-mode="scan"] .nav-item[data-mode="scan"] {
+html[data-active-tab="tab-history"] .nav-item[data-mode="scan"] {
   display: flex !important;
 }
 
 /* Mode Finish Nav Items */
 html[data-active-tab="tab-finish"] .nav-item[data-mode="finish"],
-html[data-active-tab="tab-finish-all"] .nav-item[data-mode="finish"],
-html[data-active-tab="tab-profile"][data-current-mode="finish"] .nav-item[data-mode="finish"] {
+html[data-active-tab="tab-finish-all"] .nav-item[data-mode="finish"] {
   display: flex !important;
 }
 
 /* Mode PIPO Nav Items */
-html[data-active-tab="tab-pipo"] .nav-item[data-mode="pipo"],
-html[data-active-tab="tab-profile"][data-current-mode="pipo"] .nav-item[data-mode="pipo"] {
+html[data-active-tab="tab-pipo"] .nav-item[data-mode="pipo"] {
   display: flex !important;
 }
 
@@ -261,12 +256,12 @@ html[data-active-tab="tab-finish"] .nav-item:not([data-mode="finish"]):not([data
 html[data-active-tab="tab-finish-all"] .nav-item:not([data-mode="finish"]):not([data-mode="all"]),
 html[data-active-tab="tab-scan"] .nav-item:not([data-mode="scan"]):not([data-mode="all"]),
 html[data-active-tab="tab-history"] .nav-item:not([data-mode="scan"]):not([data-mode="all"]),
-html[data-active-tab="tab-pipo"] .nav-item:not([data-mode="pipo"]):not([data-mode="all"]),
-html[data-active-tab="tab-profile"][data-current-mode="teknisi"] .nav-item:not([data-mode="teknisi"]):not([data-mode="all"]),
-html[data-active-tab="tab-profile"][data-current-mode="scan"] .nav-item:not([data-mode="scan"]):not([data-mode="all"]),
-html[data-active-tab="tab-profile"][data-current-mode="finish"] .nav-item:not([data-mode="finish"]):not([data-mode="all"]),
-html[data-active-tab="tab-profile"][data-current-mode="pipo"] .nav-item:not([data-mode="pipo"]):not([data-mode="all"]),
-html[data-active-tab="tab-profile"]:not([data-current-mode]) .nav-item:not([data-mode="teknisi"]):not([data-mode="all"]) {
+html[data-active-tab="tab-pipo"] .nav-item:not([data-mode="pipo"]):not([data-mode="all"]) {
+  display: none !important;
+}
+
+/* When Profile Tab is active (tab-profile), ONLY show Menu Utama nav item in bottom bar */
+html[data-active-tab="tab-profile"] .nav-item:not([data-target="tab-menu"]) {
   display: none !important;
 }
 
@@ -275,6 +270,12 @@ html:not(.is-admin) #nav-item-users,
 html:not(.is-admin) .nav-item[data-target="tab-users"],
 html:not(.is-admin) #tab-users,
 html:not(.is-admin) .admin-only {
+  display: none !important;
+}
+
+/* Header Akun & Pengaturan User Buttons ONLY visible on Main Menu Hub (tab-menu) */
+html[data-active-tab]:not([data-active-tab="tab-menu"]) #header-btn-profile,
+html[data-active-tab]:not([data-active-tab="tab-menu"]) #header-btn-users {
   display: none !important;
 }
 
@@ -728,6 +729,30 @@ html[data-active-tab="tab-profile"] .nav-item[data-target="tab-profile"] svg {
   flex-direction: column;
   gap: 10px;
   width: 100%;
+}
+
+/* Reorder Profile Cards on Mobile View: Header (Top) -> Form (Middle) -> Theme & Actions (Bottom) */
+@media (max-width: 767px) {
+  .profile-grid-container {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 10px !important;
+  }
+  .profile-sidebar, .profile-main {
+    display: contents !important;
+  }
+  .profile-header-card {
+    order: 1 !important;
+  }
+  .card-profile-form {
+    order: 2 !important;
+  }
+  .theme-card {
+    order: 3 !important;
+  }
+  .account-actions-card {
+    order: 4 !important;
+  }
 }
 
 .profile-sidebar, .profile-main {

@@ -111,6 +111,8 @@ const DOM = {
   headerPswStatus: document.getElementById('header-psw-status'),
   headerPswText: document.getElementById('header-psw-text'),
   headerBtnMissing: document.getElementById('header-btn-missing'),
+  headerBtnUsers: document.getElementById('header-btn-users'),
+  headerBtnProfile: document.getElementById('header-btn-profile'),
   headerNotifBtn: document.getElementById('header-notif-btn'),
   headerBellBadge: document.getElementById('header-bell-badge'),
   sheetUpdateBar: document.getElementById('sheet-update-bar'),
@@ -248,6 +250,7 @@ const DOM = {
   btnSaveProfile: document.getElementById('btn-save-profile'),
   btnTogglePswVisibility: document.getElementById('btn-toggle-psw-visibility'),
   pswEyeIcon: document.getElementById('psw-eye-icon'),
+  btnClearAppCache: document.getElementById('btn-clear-app-cache'),
   
   // History
   historyList: document.getElementById('history-list'),
@@ -689,9 +692,12 @@ function updateUIFromState() {
     DOM.profilePswToggle.disabled = true;
   }
 
-  // Toggle Admin Nav Item & Fetch Admin Users
+  // Toggle Admin Nav Item & Header User Setting Button & Fetch Admin Users
   if (DOM.navItemUsers) {
     DOM.navItemUsers.classList.toggle('hidden', !state.isAdmin);
+  }
+  if (DOM.headerBtnUsers) {
+    DOM.headerBtnUsers.classList.toggle('hidden', !state.isAdmin);
   }
   document.documentElement.classList.toggle('is-admin', !!state.isAdmin);
 
@@ -1092,6 +1098,14 @@ function setupEventListeners() {
   if (DOM.btnConfirmCancel) DOM.btnConfirmCancel.addEventListener('click', closeSubmitConfirmModal);
   if (DOM.btnConfirmOk) DOM.btnConfirmOk.addEventListener('click', handleConfirmModalOk);
 
+  // Header Action Buttons (Profile & Admin User Settings)
+  if (DOM.headerBtnProfile) {
+    DOM.headerBtnProfile.addEventListener('click', () => switchTab('tab-profile'));
+  }
+  if (DOM.headerBtnUsers) {
+    DOM.headerBtnUsers.addEventListener('click', () => switchTab('tab-users'));
+  }
+
   // Profile Save & Header PSW Badge Click Toggle
   if (DOM.headerPswStatus) DOM.headerPswStatus.addEventListener('click', handleHeaderPswToggle);
   if (DOM.btnSaveProfile) DOM.btnSaveProfile.addEventListener('click', handleSaveProfileRealtime);
@@ -1105,6 +1119,11 @@ function setupEventListeners() {
         DOM.profilePsw.type = isPsw ? 'text' : 'password';
       }
     });
+  }
+
+  // Clear App Cache Button
+  if (DOM.btnClearAppCache) {
+    DOM.btnClearAppCache.addEventListener('click', handleClearAppCache);
   }
 
   // Clear & Refresh History
@@ -1283,6 +1302,16 @@ function openClearHistoryConfirmModal() {
   lucide.createIcons();
 }
 
+function openClearCacheConfirmModal() {
+  state.modalAction = 'clearCache';
+
+  DOM.modalConfirmTitle.innerHTML = `<i data-lucide="trash-2"></i> Konfirmasi Hapus Cache`;
+  DOM.modalConfirmMsg.textContent = 'Apakah Anda Yakin Ingin Menghapus Seluruh Cache Data Aplikasi? Halaman akan dimuat ulang.';
+  DOM.modalConfirmOkText.textContent = 'Ya, Hapus Cache';
+  DOM.modalConfirm.classList.add('active');
+  lucide.createIcons();
+}
+
 function closeSubmitConfirmModal() {
   DOM.modalConfirm.classList.remove('active');
 }
@@ -1299,6 +1328,8 @@ async function handleConfirmModalOk() {
     performLogout();
   } else if (currentAction === 'clearHistory') {
     performClearHistory();
+  } else if (currentAction === 'clearCache') {
+    executeClearAppCache();
   } else if (currentAction === 'deleteUser') {
     await performDeleteUser();
   } else if (currentAction === 'deleteDraftItem') {
@@ -1468,6 +1499,36 @@ async function handleTogglePasswordRealtime() {
     } catch (err) {
       showToast(`Gagal update status password: ${err.message}`, 'error');
     }
+  }
+}
+
+function handleClearAppCache() {
+  openClearCacheConfirmModal();
+}
+
+async function executeClearAppCache() {
+  try {
+    showToast('🧹 Membersihkan cache data...', 'info');
+
+    localStorage.removeItem(STORAGE_KEYS.SHEETS_CACHE);
+    localStorage.removeItem(STORAGE_KEYS.PIPO_CACHE);
+    localStorage.removeItem(STORAGE_KEYS.FINISH_SHEET_CACHE);
+
+    if ('caches' in window) {
+      const cacheNames = await caches.keys();
+      await Promise.all(cacheNames.map(name => caches.delete(name)));
+    }
+
+    showToast('✅ Cache berhasil dibersihkan! Memuat ulang...', 'success');
+    setTimeout(() => {
+      window.location.reload();
+    }, 700);
+  } catch (err) {
+    console.error('Clear cache error:', err);
+    showToast('Memuat ulang aplikasi...', 'info');
+    setTimeout(() => {
+      window.location.reload();
+    }, 700);
   }
 }
 
