@@ -22,7 +22,60 @@
   <!-- App Favicon (Part Box & Laser Scanner Icon) -->
   <link rel="icon" type="image/svg+xml" href="favicon.svg" />
 
-  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="style.css?v=19.0" />
+  <script>
+    window.__INIT_NAMA__ = '';
+    window.__INIT_NIK__ = '';
+    window.__INIT_USE_PSW__ = true;
+    window.__INIT_SHEET_TS__ = '';
+    try {
+      var sess = localStorage.getItem('teknisi_current_session');
+      var prof = localStorage.getItem('teknisi_profile_data');
+      var sheetsCache = localStorage.getItem('google_sheets_cache');
+      if (sheetsCache) {
+        var sc = JSON.parse(sheetsCache);
+        if (sc) {
+          window.__INIT_SHEET_TS__ = sc.pendingTimestamp || sc.lastUpdateTimestamp || sc.performaTimestamp || '';
+        }
+      }
+      if (sess) {
+        var p = JSON.parse(sess);
+        if (p && p.isLoggedIn) {
+          document.documentElement.classList.add('is-logged-in');
+          var isAdmin = (p.nik && (p.nik.toUpperCase() === 'ADMIN' || p.isAdmin));
+          if (isAdmin) {
+            document.documentElement.classList.add('is-admin');
+          } else {
+            document.documentElement.classList.remove('is-admin');
+          }
+          var hashTab = window.location.hash ? window.location.hash.replace('#', '') : '';
+          var savedTab = localStorage.getItem('teknisi_last_active_tab');
+          var savedMode = localStorage.getItem('teknisi_last_active_mode') || 'teknisi';
+          var validTabs = ['tab-menu', 'tab-scan', 'tab-history', 'tab-pending', 'tab-performa', 'tab-notif', 'tab-part-kembali', 'tab-tagihan', 'tab-pipo', 'tab-finish', 'tab-finish-all', 'tab-profile'];
+          if (isAdmin) validTabs.push('tab-users');
+          var activeTab = (hashTab && validTabs.indexOf(hashTab) !== -1) ? hashTab : ((savedTab && validTabs.indexOf(savedTab) !== -1) ? savedTab : 'tab-menu');
+          document.documentElement.setAttribute('data-active-tab', activeTab);
+          document.documentElement.setAttribute('data-current-mode', savedMode);
+
+          if (isAdmin) {
+            window.__INIT_NAMA__ = 'Administrator';
+            window.__INIT_NIK__ = 'ADMIN';
+          } else {
+            if (prof) {
+              var pr = JSON.parse(prof);
+              if (pr) {
+                window.__INIT_NAMA__ = pr.nama || '';
+                window.__INIT_NIK__ = pr.nik || '';
+                if (typeof pr.usePsw === 'boolean') window.__INIT_USE_PSW__ = pr.usePsw;
+              }
+            }
+            if (!window.__INIT_NIK__ && p.nik) window.__INIT_NIK__ = p.nik;
+            if (!window.__INIT_NAMA__ && p.nama) window.__INIT_NAMA__ = p.nama;
+          }
+        }
+      }
+    } catch(e) {}
+  </script>
 </head>
 <body>
   <!-- Mobile App Frame Container -->
@@ -36,7 +89,7 @@
         <div class="login-card">
           <div class="login-header">
             <div class="login-logo">
-              <i data-lucide="user"></i>
+              <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-user"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
             </div>
             <h2>TASIKMALAYA</h2>
             <p>Masukkan Username / NIK dan Password Anda</p>
@@ -46,7 +99,7 @@
             <div class="form-group">
               <label for="login-username">Username / NIK Teknisi</label>
               <div class="input-icon-wrapper">
-                <i data-lucide="user" class="input-icon"></i>
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="input-icon lucide lucide-user"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
                 <input type="text" id="login-username" placeholder="Masukkan NIK..." required />
               </div>
             </div>
@@ -88,16 +141,16 @@
       <header class="app-header">
         <div class="header-info">
           <div class="header-text">
-            <h1 id="header-nama">Teknisi (Belum Diset)</h1>
-            <span class="nik-badge" id="header-nik"><i data-lucide="id-card"></i> NIK: -</span>
+            <h1 id="header-nama"><script>document.write(window.__INIT_NAMA__ || 'Teknisi (Belum Diset)');</script></h1>
+            <span class="nik-badge" id="header-nik"><svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-id-card"><rect width="18" height="14" x="3" y="5" rx="2"/><path d="M7 10h4"/><path d="M7 14h2"/><path d="M14 10a2 2 0 1 0 4 0 2 2 0 0 0-4 0"/><path d="M13 17a3 3 0 0 1 6 0"/></svg> <script>document.write(window.__INIT_NIK__ ? 'NIK: ' + window.__INIT_NIK__ : 'NIK: -');</script></span>
           </div>
         </div>
         <div class="header-right-actions">
-          <div class="header-psw-badge" id="header-psw-status">
-            <i data-lucide="shield-check"></i> <span id="header-psw-text">PSW: ON</span>
+          <div class="header-psw-badge <script>if(window.__INIT_USE_PSW__===false)document.write('off');</script>" id="header-psw-status">
+            <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-shield-check"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></svg> <span id="header-psw-text"><script>document.write(window.__INIT_USE_PSW__ === false ? 'PSW: OFF' : 'PSW: ON');</script></span>
           </div>
-          <button type="button" id="header-btn-missing" class="header-psw-badge hidden" style="background:var(--primary); border:1px solid rgba(255,255,255,0.4);" title="Cek tanggal laporan yang belum diisi">
-            <i data-lucide="calendar"></i> <span>Cek Tanggal Belum Isi</span>
+          <button type="button" id="header-btn-missing" class="header-psw-badge" style="background:var(--primary); border:1px solid rgba(255,255,255,0.4);" title="Cek tanggal laporan yang belum diisi">
+            <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-calendar"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg> <span>Cek Tanggal Belum Isi</span>
           </button>
         </div>
       </header>
@@ -105,7 +158,7 @@
       <!-- Sheet Live Data Status Bar (Direct Z2 Cell Content) -->
       <div class="sheet-update-bar" id="sheet-update-bar">
         <div class="sheet-update-left">
-          <strong id="sheet-z2-timestamp">Memuat data....</strong>
+          <strong id="sheet-z2-timestamp"><script>document.write(window.__INIT_SHEET_TS__ || 'Memuat data....');</script></strong>
         </div>
       </div>
 
@@ -113,7 +166,7 @@
       <main class="app-body">
 
         <!-- TAB 0: MENU UTAMA (HUB SELEKSI MODE APK SCAN / PORTAL TEKNISI) -->
-        <section id="tab-menu" class="tab-content active">
+        <section id="tab-menu" class="tab-content">
           <div class="menu-hub-wrapper">
             <div class="menu-hub-welcome">
               <i data-lucide="sparkles"></i>
@@ -254,15 +307,24 @@
           <div class="card">
             <div class="card-header">
               <div class="card-title">
-                <i data-lucide="clock"></i> Data Case Pending
-                <span class="badge-count" id="pending-tech-count">0 Case</span>
+                <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-clock" style="color:var(--primary);"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> Data Case Pending
+                <span class="badge-count" id="pending-tech-count"><script>
+                  try {
+                    var raw = localStorage.getItem('google_sheets_cache');
+                    if (raw) {
+                      var sc = JSON.parse(raw);
+                      if (sc && sc.pendingCases) { document.write(sc.pendingCases.length + ' Case'); }
+                      else { document.write('0 Case'); }
+                    } else { document.write('0 Case'); }
+                  } catch(e) { document.write('0 Case'); }
+                </script></span>
               </div>
             </div>
 
             <!-- Search Filter Bar -->
             <div class="manual-add-row mb-12">
               <div class="input-icon-wrapper flex-1">
-                <i data-lucide="search" class="input-icon"></i>
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="input-icon lucide lucide-search"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
                 <input type="text" id="input-search-pending" placeholder="Cari No SCL, Type, Seri, Status..." autocomplete="off" />
                 <button id="btn-clear-search-pending" class="btn-clear" title="Clear Search" style="display:none;">
                   <i data-lucide="x"></i>
@@ -271,10 +333,40 @@
             </div>
 
             <div id="pending-list-container" class="pending-container">
-              <div class="empty-state-sm">
-                <i data-lucide="loader-2" class="spin-lg"></i>
-                <p>Memuat data Pending...</p>
-              </div>
+              <script>
+                (function() {
+                  try {
+                    var raw = localStorage.getItem('google_sheets_cache');
+                    if (raw) {
+                      var sc = JSON.parse(raw);
+                      if (sc && sc.pendingCases && sc.pendingCases.length > 0) {
+                        var html = sc.pendingCases.map(function(item) {
+                          var statusLower = (item.status || '').toLowerCase();
+                          var statusClass = 'printed';
+                          if (statusLower.indexOf('wip comp') !== -1 || statusLower.indexOf('selesai') !== -1) statusClass = 'wip-comp';
+                          else if (statusLower.indexOf('wip') !== -1) statusClass = 'wip';
+                          return '<div class="pending-card">' +
+                            '<div class="pending-card-header"><div class="pending-scl"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--primary);"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg> ' + (item.no_scl || '-') + '</div></div>' +
+                            '<div class="pending-info-grid">' +
+                              '<div class="pending-info-item"><span>Tgl Case</span><strong>' + (item.tgl || '-') + '</strong></div>' +
+                              '<div class="pending-info-item"><span>Layanan</span><strong>' + (item.layanan || '-') + '</strong></div>' +
+                              '<div class="pending-info-item"><span>Type Unit</span><strong>' + (item.type || '-') + '</strong></div>' +
+                              '<div class="pending-info-item"><span>No Seri</span><strong>' + (item.seri || '-') + '</strong></div>' +
+                              '<div class="pending-info-item"><span>Status Case</span><strong>' + (item.status || 'PENDING') + '</strong></div>' +
+                              '<div class="pending-info-item"><span>Usia Case</span><strong style="color:var(--warning);">' + (item.usia ? item.usia + ' Hari' : '-') + '</strong></div>' +
+                            '</div>' +
+                            (item.ket_part ? '<div style="margin-top:4px;font-size:10px;"><span class="pending-part-desc">' + item.ket_part + '</span></div>' : '') +
+                            '<div class="pending-card-footer"><span class="pending-status-badge ' + statusClass + '">' + (item.status || 'PENDING') + '</span></div>' +
+                          '</div>';
+                        }).join('');
+                        document.write(html);
+                        return;
+                      }
+                    }
+                  } catch(e) {}
+                  document.write('<div class="empty-state-sm"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="spin-lg" style="color:var(--primary);"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg><p>Memuat data Pending...</p></div>');
+                })();
+              </script>
             </div>
           </div>
         </section>
@@ -450,7 +542,7 @@
                   <label for="finish-tgl">Tanggal Laporan</label>
                   <div class="input-icon-wrapper">
                     <i data-lucide="calendar" class="input-icon"></i>
-                    <input type="date" id="finish-tgl" class="custom-select" placeholder="dd/mm/yyyy" style="padding-left:36px;" required />
+                    <input type="text" id="finish-tgl" class="custom-select" placeholder="dd/mm/yyyy" style="padding-left:36px;" required onfocus="(this.type='date')" onblur="if(!this.value)this.type='text'" onchange="if(!this.value)this.type='text'" />
                   </div>
                 </div>
 
@@ -460,7 +552,7 @@
                     <label for="finish-case-outdoor">Jumlah Case Ditugaskan (Outdoor)</label>
                     <div class="input-icon-wrapper">
                       <i data-lucide="sun" class="input-icon"></i>
-                      <input type="number" id="finish-case-outdoor" min="0" placeholder="0" />
+                      <input type="number" id="finish-case-outdoor" min="0" />
                     </div>
                   </div>
 
@@ -468,7 +560,7 @@
                     <label for="finish-finish-outdoor">Jumlah Case Finish Outdoor</label>
                     <div class="input-icon-wrapper">
                       <i data-lucide="check-circle" class="input-icon"></i>
-                      <input type="number" id="finish-finish-outdoor" min="0" placeholder="0" />
+                      <input type="number" id="finish-finish-outdoor" min="0" />
                     </div>
                   </div>
 
@@ -476,7 +568,7 @@
                     <label for="finish-finish-indoor">Jumlah Case Finish Indoor</label>
                     <div class="input-icon-wrapper">
                       <i data-lucide="home" class="input-icon"></i>
-                      <input type="number" id="finish-finish-indoor" min="0" placeholder="0" />
+                      <input type="number" id="finish-finish-indoor" min="0" />
                     </div>
                   </div>
 
@@ -484,7 +576,7 @@
                     <label for="finish-wip-comp">Jumlah Case WIP COMP</label>
                     <div class="input-icon-wrapper">
                       <i data-lucide="clock" class="input-icon"></i>
-                      <input type="number" id="finish-wip-comp" min="0" placeholder="0" />
+                      <input type="number" id="finish-wip-comp" min="0" />
                     </div>
                   </div>
 
@@ -492,7 +584,7 @@
                     <label for="finish-wip-tech">Jumlah Case WIP TECH (IN)</label>
                     <div class="input-icon-wrapper">
                       <i data-lucide="wrench" class="input-icon"></i>
-                      <input type="number" id="finish-wip-tech" min="0" placeholder="0" />
+                      <input type="number" id="finish-wip-tech" min="0" />
                     </div>
                   </div>
 
@@ -500,7 +592,7 @@
                     <label for="finish-batal">Jumlah Case Batal</label>
                     <div class="input-icon-wrapper">
                       <i data-lucide="x-circle" class="input-icon"></i>
-                      <input type="number" id="finish-batal" min="0" placeholder="0" />
+                      <input type="number" id="finish-batal" min="0" />
                     </div>
                   </div>
 
@@ -508,7 +600,7 @@
                     <label for="finish-antar">Pengembalian (Antar)</label>
                     <div class="input-icon-wrapper">
                       <i data-lucide="truck" class="input-icon"></i>
-                      <input type="number" id="finish-antar" min="0" placeholder="0" />
+                      <input type="number" id="finish-antar" min="0" />
                     </div>
                   </div>
 
@@ -516,7 +608,7 @@
                     <label for="finish-no-visit">Tidak Terkunjungi</label>
                     <div class="input-icon-wrapper">
                       <i data-lucide="alert-circle" class="input-icon"></i>
-                      <input type="number" id="finish-no-visit" min="0" placeholder="0" />
+                      <input type="number" id="finish-no-visit" min="0" />
                     </div>
                   </div>
                 </div>
@@ -554,7 +646,7 @@
 
                 <!-- Filter Bar (Card Pencarian Paten - 1 Baris) -->
                 <div class="finish-filter-bar align-center mb-2" style="background:var(--card-bg-light); padding:6px 8px; border-radius:6px; border:1px solid var(--border-color); display:flex; gap:6px; align-items:center;">
-                  <input type="date" id="finish-all-filter-date" class="custom-select" placeholder="dd/mm/yyyy" style="font-size:11.5px; padding:4px 6px; height:32px; flex:1; min-width:0; border-radius:4px;" title="Filter berdasarkan Tanggal" />
+                  <input type="text" id="finish-all-filter-date" class="custom-select" placeholder="dd/mm/yyyy" style="font-size:11.5px; padding:4px 6px; height:32px; flex:1; min-width:0; border-radius:4px;" title="Filter berdasarkan Tanggal" onfocus="(this.type='date')" onblur="if(!this.value)this.type='text'" onchange="if(!this.value)this.type='text'" />
                   <div id="finish-all-tech-filter-wrapper" style="flex:1; min-width:0; display:none;">
                     <input type="text" id="finish-all-filter-tech" placeholder="Cari nama teknisi..." class="custom-select" style="font-size:11.5px; padding:4px 8px; height:32px; width:100%; border-radius:4px;" autocomplete="off" />
                   </div>
@@ -583,93 +675,93 @@
 
         <!-- TAB 6: DEDICATED HALAMAN PROFIL -->
         <section id="tab-profile" class="tab-content">
-          
-          <!-- Card Profil Header User -->
-          <div class="card profile-header-card">
-            <div class="profile-avatar-lg">
-              <i data-lucide="user-check"></i>
-            </div>
-            <div class="profile-details-text">
-              <h2 id="prof-disp-nama">Nama Teknisi</h2>
-              <span class="prof-badge-nik" id="prof-disp-nik">NIK: -</span>
-              <span class="prof-status-online"><i data-lucide="circle-dot"></i> Akun Teknisi Aktif</span>
-            </div>
-          </div>
-
-          <!-- Card Switcher Tema Tampilan -->
-          <div class="card theme-card">
-            <div class="card-title">
-              <i data-lucide="palette"></i> Pilihan Tema Tampilan
-            </div>
-            <div class="theme-options-grid">
-              <button type="button" class="btn-theme-opt active" id="btn-theme-dark" data-theme-val="dark">
-                <i data-lucide="moon"></i> Dark Slate (Default)
-              </button>
-              <button type="button" class="btn-theme-opt" id="btn-theme-light" data-theme-val="light">
-                <i data-lucide="sun"></i> Terang (Light)
-              </button>
-            </div>
-          </div>
-
-          <!-- Card Form Edit Profil -->
-          <div class="card card-profile-form">
-            <div class="card-title">
-              <i data-lucide="user-cog"></i> Pengaturan Akun Teknisi
-            </div>
-
-            <form id="form-profile" onsubmit="return false;">
-              <div class="form-group">
-                <label for="profile-nama">Nama Teknisi</label>
-                <div class="input-icon-wrapper">
-                  <i data-lucide="user" class="input-icon"></i>
-                  <input type="text" id="profile-nama" placeholder="Masukkan nama..." required />
+          <div class="profile-grid-container">
+            <!-- Sidebar Left Column (User Info + Theme + Logout on PC) -->
+            <div class="profile-sidebar">
+              <!-- Card Profil Header User -->
+              <div class="card profile-header-card">
+                <div class="profile-avatar-lg">
+                  <i data-lucide="user-check"></i>
+                </div>
+                <div class="profile-details-text">
+                  <h2 id="prof-disp-nama"><script>document.write(window.__INIT_NAMA__ || 'Nama Teknisi');</script></h2>
+                  <div>
+                    <span class="prof-badge-nik" id="prof-disp-nik"><script>document.write(window.__INIT_NIK__ ? 'NIK: ' + window.__INIT_NIK__ : 'NIK: -');</script></span>
+                  </div>
+                  <span class="prof-status-online"><i data-lucide="circle-dot"></i> Akun Teknisi Aktif</span>
                 </div>
               </div>
 
-              <div class="form-group">
-                <label for="profile-nik">NIK (Nomor Induk Karyawan)</label>
-                <div class="input-icon-wrapper">
-                  <i data-lucide="id-card" class="input-icon"></i>
-                  <input type="text" id="profile-nik" placeholder="Masukkan NIK..." required />
+              <!-- Card Switcher Tema Tampilan -->
+              <div class="card theme-card">
+                <div class="card-title">
+                  <i data-lucide="palette"></i> Pilihan Tema Tampilan
                 </div>
-              </div>
-
-              <div class="form-group">
-                <label for="profile-psw">Password Akses Web Target</label>
-                <div class="input-icon-wrapper">
-                  <input type="password" id="profile-psw" placeholder="Password akun web..." style="padding-left:12px;" />
-                  <button type="button" id="btn-toggle-psw-visibility" class="btn-clear" title="Lihat Password">
-                    <i data-lucide="eye" id="psw-eye-icon"></i>
+                <div class="theme-options-grid">
+                  <button type="button" class="btn-theme-opt active" id="btn-theme-dark" data-theme-val="dark">
+                    <i data-lucide="moon"></i> Dark Slate (Default)
+                  </button>
+                  <button type="button" class="btn-theme-opt" id="btn-theme-light" data-theme-val="light">
+                    <i data-lucide="sun"></i> Terang (Light)
                   </button>
                 </div>
               </div>
 
-              <!-- Switch Status PSW -->
-              <div class="switch-card">
-                <div class="switch-info">
-                  <div class="switch-label">
-                    <i data-lucide="shield-check"></i> STATUS PSW
-                  </div>
+              <!-- Tombol Logout (Desktop Left Column) -->
+              <div class="logout-wrapper desktop-only">
+                <button type="button" id="btn-logout" class="btn btn-block btn-sm btn-logout-danger" style="background: #ef4444 !important; color: #ffffff !important; border: 1px solid #dc2626 !important; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 8px;">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-log-out" style="color:#ffffff !important; stroke:#ffffff !important;"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></svg>
+                  <span>KELUAR AKUN (LOGOUT)</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Main Right Column (Profile Settings Form) -->
+            <div class="profile-main">
+              <!-- Card Form Edit Profil -->
+              <div class="card card-profile-form">
+                <div class="card-title mb-2">
+                  <i data-lucide="user-cog"></i> Informasi Akun Teknisi
                 </div>
-                <label class="toggle-switch">
-                  <input type="checkbox" id="profile-psw-toggle" />
-                  <span class="slider"></span>
-                </label>
+
+                <form id="form-profile" onsubmit="return false;">
+                  <div class="form-group mb-2">
+                    <label for="profile-nama">Nama Teknisi</label>
+                    <div class="input-icon-wrapper">
+                      <i data-lucide="user" class="input-icon"></i>
+                      <input type="text" id="profile-nama" placeholder="Nama..." readonly title="Pengubahan nama hanya melalui halaman Kelola User" />
+                    </div>
+                  </div>
+
+                  <div class="form-group mb-2">
+                    <label for="profile-nik">NIK (Nomor Induk Karyawan)</label>
+                    <div class="input-icon-wrapper">
+                      <i data-lucide="id-card" class="input-icon"></i>
+                      <input type="text" id="profile-nik" placeholder="NIK..." readonly title="Pengubahan NIK hanya melalui halaman Kelola User" />
+                    </div>
+                  </div>
+
+                  <div class="form-group mb-2">
+                    <label for="profile-psw">Password Akses Web Target</label>
+                    <div class="input-icon-wrapper">
+                      <input type="password" id="profile-psw" placeholder="Password akun..." readonly title="Pengubahan Password hanya melalui halaman Kelola User" style="padding-left:12px;" />
+                      <button type="button" id="btn-toggle-psw-visibility" class="btn-clear" title="Lihat Password">
+                        <i data-lucide="eye" id="psw-eye-icon"></i>
+                      </button>
+                    </div>
+                  </div>
+                </form>
               </div>
 
-              <button type="button" id="btn-save-profile" class="btn btn-primary btn-block btn-sm">
-                <i data-lucide="save"></i> Simpan Profil & Pengaturan
-              </button>
-            </form>
+              <!-- Tombol Logout (Mobile Bottom) -->
+              <div class="logout-wrapper mobile-only">
+                <button type="button" class="btn btn-block btn-sm btn-logout-danger" onclick="document.getElementById('btn-logout').click()" style="background: #ef4444 !important; color: #ffffff !important; border: 1px solid #dc2626 !important; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 8px;">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-log-out" style="color:#ffffff !important; stroke:#ffffff !important;"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></svg>
+                  <span>KELUAR AKUN (LOGOUT)</span>
+                </button>
+              </div>
+            </div>
           </div>
-
-          <!-- Tombol Logout -->
-          <div class="logout-wrapper">
-            <button type="button" id="btn-logout" class="btn btn-ghost btn-block btn-sm text-danger">
-              <i data-lucide="log-out"></i> KELUAR AKUN (LOGOUT)
-            </button>
-          </div>
-
         </section>
 
         <!-- TAB 8: PART PENGGANTI (PIPO SHEET DATA) -->
@@ -789,56 +881,56 @@
 
       <!-- Bottom Navigation Bar (Hidden on Main Menu Hub) -->
       <nav class="app-nav hidden" id="app-nav">
-        <button class="nav-item active" data-target="tab-menu" data-mode="all" title="Kembali ke Menu Utama">
-          <i data-lucide="layout-grid"></i>
+        <button class="nav-item" data-target="tab-menu" data-mode="all" title="Kembali ke Menu Utama">
+          <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-layout-grid"><rect width="7" height="7" x="3" y="3" rx="1"/><rect width="7" height="7" x="14" y="3" rx="1"/><rect width="7" height="7" x="14" y="14" rx="1"/><rect width="7" height="7" x="3" y="14" rx="1"/></svg>
           <span>Menu</span>
         </button>
-        <button class="nav-item" data-target="tab-scan" data-mode="scan" style="display: none;">
-          <i data-lucide="qr-code"></i>
+        <button class="nav-item" data-target="tab-scan" data-mode="scan">
+          <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-qr-code"><rect width="5" height="5" x="3" y="3" rx="1"/><rect width="5" height="5" x="16" y="3" rx="1"/><rect width="5" height="5" x="3" y="16" rx="1"/><path d="M21 16h-3a2 2 0 0 0-2 2v3"/><path d="M21 21v.01"/><path d="M12 7v3a2 2 0 0 1-2 2H7"/><path d="M3 12h.01"/><path d="M12 3h.01"/><path d="M12 16v.01"/><path d="M16 12h1"/><path d="M21 12v.01"/><path d="M12 21v-1"/></svg>
           <span>Scan</span>
         </button>
-        <button class="nav-item" data-target="tab-history" data-mode="scan" style="display: none;">
-          <i data-lucide="history"></i>
+        <button class="nav-item" data-target="tab-history" data-mode="scan">
+          <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-history"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/></svg>
           <span>Riwayat</span>
         </button>
 
         <button class="nav-item" data-target="tab-pending" data-mode="teknisi">
-          <i data-lucide="clock"></i>
+          <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-clock"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
           <span>Pending</span>
           <span class="nav-badge hidden" id="nav-pending-badge">0</span>
         </button>
         <button class="nav-item" data-target="tab-performa" data-mode="teknisi">
-          <i data-lucide="trending-up"></i>
+          <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-trending-up"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
           <span>Performa</span>
         </button>
         <button class="nav-item" data-target="tab-part-kembali" data-mode="teknisi" title="Part Belum Kembali">
-          <i data-lucide="package"></i>
+          <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-package"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>
           <span>PART</span>
         </button>
         <button class="nav-item" data-target="tab-tagihan" data-mode="teknisi" title="Tagihan Teknisi">
-          <i data-lucide="banknote"></i>
+          <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-banknote"><rect width="20" height="12" x="2" y="6" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 12h.01M18 12h.01"/></svg>
           <span>TAGIHAN</span>
         </button>
         <button class="nav-item" data-target="tab-finish" data-mode="finish" title="Input Finish Harian">
-          <i data-lucide="edit-3"></i>
+          <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-edit-3"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
           <span>Form</span>
         </button>
         <button class="nav-item" data-target="tab-finish-all" data-mode="finish" title="Semua Data Laporan Finish">
-          <i data-lucide="clipboard-list"></i>
+          <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-clipboard-list"><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M12 11h4"/><path d="M12 16h4"/><path d="M8 11h.01"/><path d="M8 16h.01"/></svg>
           <span>Semua Data</span>
         </button>
 
         <button class="nav-item" data-target="tab-pipo" data-mode="pipo">
-          <i data-lucide="arrow-left-right"></i>
+          <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-arrow-left-right"><path d="m16 3 4 4-4 4"/><path d="M20 7H4"/><path d="m8 21-4-4 4-4"/><path d="M4 17h16"/></svg>
           <span>Pengganti</span>
         </button>
 
         <button class="nav-item" data-target="tab-profile" data-mode="all">
-          <i data-lucide="user-cog"></i>
+          <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-user-cog"><circle cx="18" cy="15" r="3"/><circle cx="9" cy="7" r="4"/><path d="M10 15H6a4 4 0 0 0-4 4v2"/><path d="m21.7 16.4-.9-.3"/><path d="m15.2 13.9-.9-.3"/><path d="m16.4 21.7-.3-.9"/><path d="m13.9 15.2-.3-.9"/><path d="m21.7 13.6-.9.3"/><path d="m15.2 16.1-.9.3"/><path d="m13.9 14.8-.3.9"/><path d="m16.4 8.3-.3.9"/></svg>
           <span>Profil</span>
         </button>
         <button class="nav-item admin-only hidden" id="nav-item-users" data-target="tab-users" data-mode="all">
-          <i data-lucide="users"></i>
+          <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-users"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
           <span>User</span>
         </button>
       </nav>
@@ -915,9 +1007,7 @@
           </div>
         </div>
         <div class="modal-body" style="padding: 10px 8px; overflow-y: auto; flex: 1;">
-          <div id="missing-finish-summary" class="mb-3" style="font-size: 12.5px; color: var(--text-muted); line-height: 1.4;">
-            Memuat data...
-          </div>
+          <div id="missing-finish-summary" class="mb-3" style="font-size: 12.5px; color: var(--text-muted); line-height: 1.4;"></div>
           <div id="missing-finish-list" class="missing-list-container" style="display: flex; flex-direction: column; gap: 8px;">
             <!-- List of dates rendered here -->
           </div>
@@ -993,6 +1083,11 @@
 
   </div>
 
-  <script src="app.js"></script>
+  <script>
+    if (window.lucide && typeof lucide.createIcons === 'function') {
+      lucide.createIcons();
+    }
+  </script>
+  <script src="app.js?v=16.0"></script>
 </body>
 </html>

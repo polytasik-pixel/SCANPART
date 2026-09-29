@@ -16,7 +16,8 @@ const STORAGE_KEYS = {
   SHEETS_CACHE: 'google_sheets_cache',
   PIPO_CACHE: 'pipo_sheets_cache',
   FINISH_HISTORY: 'teknisi_finish_history',
-  FINISH_SHEET_CACHE: 'finish_sheet_cache'
+  FINISH_SHEET_CACHE: 'finish_sheet_cache',
+  LAST_TAB: 'teknisi_last_active_tab'
 };
 
 let state = {
@@ -369,6 +370,16 @@ function checkLoginSession() {
           };
           updateUIFromState();
         } else {
+          const storedProfile = localStorage.getItem(STORAGE_KEYS.PROFILE);
+          if (storedProfile) {
+            try {
+              const parsedProfile = JSON.parse(storedProfile);
+              if (parsedProfile && parsedProfile.nama) {
+                state.profile = parsedProfile;
+              }
+            } catch (e) {}
+          }
+          updateUIFromState();
           syncProfileFromSupabase(parsed.nik);
         }
         showAppScreen();
@@ -383,6 +394,8 @@ function checkLoginSession() {
 function showLoginScreen() {
   state.isLoggedIn = false;
   state.isAdmin = false;
+  document.documentElement.classList.remove('is-logged-in');
+  document.documentElement.classList.remove('is-admin');
   DOM.screenLogin.classList.add('active');
   DOM.screenApp.classList.remove('active');
   stopScanner();
@@ -401,15 +414,29 @@ function showLoginScreen() {
 }
 
 function showAppScreen() {
+  document.documentElement.classList.add('is-logged-in');
+  document.documentElement.classList.toggle('is-admin', !!state.isAdmin);
   DOM.screenLogin.classList.remove('active');
   DOM.screenApp.classList.add('active');
 
+  const hashTab = window.location.hash ? window.location.hash.replace('#', '') : '';
+  const savedTab = localStorage.getItem(STORAGE_KEYS.LAST_TAB);
+
+  const validTabs = ['tab-menu', 'tab-scan', 'tab-history', 'tab-pending', 'tab-performa', 'tab-notif', 'tab-part-kembali', 'tab-tagihan', 'tab-pipo', 'tab-finish', 'tab-finish-all', 'tab-profile'];
+  if (state.isAdmin) validTabs.push('tab-users');
+  let initialTab = 'tab-menu';
+
+  if (hashTab && validTabs.includes(hashTab)) {
+    initialTab = hashTab;
+  } else if (savedTab && validTabs.includes(savedTab)) {
+    initialTab = savedTab;
+  }
+
   try {
-    history.replaceState({ tab: 'tab-menu' }, '', '#tab-menu');
-    history.pushState({ tab: 'tab-menu' }, '', '#tab-menu');
+    history.replaceState({ tab: initialTab }, '', '#' + initialTab);
   } catch (e) {}
 
-  switchTab('tab-menu', false);
+  switchTab(initialTab, false);
   updateUIFromState();
   subscribeRealtimeSettings();
   subscribeGlobalQueueRealtime();
@@ -642,16 +669,29 @@ function updateUIFromState() {
   DOM.profDispNama.textContent = state.profile.nama || 'Teknisi Anonim';
   DOM.profDispNik.textContent = `NIK: ${state.profile.nik || '-'}`;
 
-  // Update Profile Form Fields
-  DOM.profileNama.value = state.profile.nama || '';
-  DOM.profileNik.value = state.profile.nik || '';
-  DOM.profilePsw.value = state.profile.psw || '';
-  DOM.profilePswToggle.checked = !!state.profile.usePsw;
+  // Update Profile Form Fields (Read-Only)
+  if (DOM.profileNama) {
+    DOM.profileNama.value = state.profile.nama || '';
+    DOM.profileNama.readOnly = true;
+  }
+  if (DOM.profileNik) {
+    DOM.profileNik.value = state.profile.nik || '';
+    DOM.profileNik.readOnly = true;
+  }
+  if (DOM.profilePsw) {
+    DOM.profilePsw.value = state.profile.psw || '';
+    DOM.profilePsw.readOnly = true;
+  }
+  if (DOM.profilePswToggle) {
+    DOM.profilePswToggle.checked = !!state.profile.usePsw;
+    DOM.profilePswToggle.disabled = true;
+  }
 
   // Toggle Admin Nav Item & Fetch Admin Users
   if (DOM.navItemUsers) {
     DOM.navItemUsers.classList.toggle('hidden', !state.isAdmin);
   }
+  document.documentElement.classList.toggle('is-admin', !!state.isAdmin);
 
   if (state.isAdmin) {
     fetchAdminUsersList();
@@ -671,20 +711,44 @@ function updateUIFromState() {
 // ==========================================
 function setupEventListeners() {
   // Theme Buttons
-  DOM.btnThemeDark.addEventListener('click', () => applyTheme('dark'));
-  DOM.btnThemeLight.addEventListener('click', () => applyTheme('light'));
+  if (DOM.btnThemeDark) DOM.btnThemeDark.addEventListener('click', () => applyTheme('dark'));
+  if (DOM.btnThemeLight) DOM.btnThemeLight.addEventListener('click', () => applyTheme('light'));
 
   // Login Password Eye Toggle
-  DOM.btnLoginPswToggle.addEventListener('click', () => {
-    const isPsw = DOM.loginPassword.type === 'password';
-    DOM.loginPassword.type = isPsw ? 'text' : 'password';
-  });
+  if (DOM.btnLoginPswToggle) {
+    DOM.btnLoginPswToggle.addEventListener('click', () => {
+      const isPsw = DOM.loginPassword.type === 'password';
+      DOM.loginPassword.type = isPsw ? 'text' : 'password';
+    });
+  }
 
-  // Login Submit Buttons
-  DOM.btnDoLogin.addEventListener('click', handleLogin);
+  // Login Submit & Enter Key Listeners
+  if (DOM.btnDoLogin) DOM.btnDoLogin.addEventListener('click', handleLogin);
+  if (DOM.formLogin) {
+    DOM.formLogin.addEventListener('submit', (e) => {
+      e.preventDefault();
+      handleLogin();
+    });
+  }
+  if (DOM.loginUsername) {
+    DOM.loginUsername.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        handleLogin();
+      }
+    });
+  }
+  if (DOM.loginPassword) {
+    DOM.loginPassword.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        handleLogin();
+      }
+    });
+  }
 
   // Logout Button
-  DOM.btnLogout.addEventListener('click', handleLogout);
+  if (DOM.btnLogout) DOM.btnLogout.addEventListener('click', handleLogout);
 
   // Mode Hub Cards Click Listeners
   if (DOM.btnSelectModeScan) {
@@ -803,9 +867,17 @@ function setupEventListeners() {
   if (DOM.btnCloseMissingModal) DOM.btnCloseMissingModal.addEventListener('click', closeMissingModal);
   if (DOM.btnDismissMissingModal) DOM.btnDismissMissingModal.addEventListener('click', () => closeMissingModal());
   if (DOM.btnRefreshMissing) {
-    DOM.btnRefreshMissing.addEventListener('click', () => {
-      showToast('🔄 Memperbarui data...', 'info');
-      openMissingModal(false);
+    DOM.btnRefreshMissing.addEventListener('click', async () => {
+      const syncIcon = document.getElementById('sync-icon-missing') || DOM.syncIconMissing;
+      if (syncIcon) syncIcon.classList.add('spinning');
+      if (DOM.btnRefreshMissing) DOM.btnRefreshMissing.disabled = true;
+      try {
+        await openMissingModal(false, true);
+      } finally {
+        const activeIcon = document.getElementById('sync-icon-missing') || DOM.syncIconMissing;
+        if (activeIcon) activeIcon.classList.remove('spinning');
+        if (DOM.btnRefreshMissing) DOM.btnRefreshMissing.disabled = false;
+      }
     });
   }
 
@@ -856,7 +928,10 @@ function setupEventListeners() {
 
   if (DOM.btnClearFinishFilterDate) {
     DOM.btnClearFinishFilterDate.addEventListener('click', () => {
-      if (DOM.finishAllFilterDate) DOM.finishAllFilterDate.value = '';
+      if (DOM.finishAllFilterDate) {
+        DOM.finishAllFilterDate.value = '';
+        DOM.finishAllFilterDate.type = 'text';
+      }
       if (DOM.finishAllFilterTech) DOM.finishAllFilterTech.value = '';
       renderFinishAllDataTab();
     });
@@ -988,40 +1063,50 @@ function setupEventListeners() {
   }
 
   // Camera Scanner Buttons
-  DOM.btnToggleCamera.addEventListener('click', toggleScanner);
+  if (DOM.btnToggleCamera) DOM.btnToggleCamera.addEventListener('click', toggleScanner);
   if (DOM.btnToggleTorch) DOM.btnToggleTorch.addEventListener('click', toggleTorch);
   if (DOM.btnSimulasiScan) DOM.btnSimulasiScan.addEventListener('click', simulateScan);
 
   // Manual Add Line
-  DOM.btnAddManual.addEventListener('click', handleAddManualItem);
-  DOM.inputNoGudang.addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') handleAddManualItem();
-  });
+  if (DOM.btnAddManual) DOM.btnAddManual.addEventListener('click', handleAddManualItem);
+  if (DOM.inputNoGudang) {
+    DOM.inputNoGudang.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') handleAddManualItem();
+    });
+  }
 
-  DOM.btnClearGudang.addEventListener('click', () => {
-    DOM.inputNoGudang.value = '';
-    DOM.inputNoGudang.focus();
-  });
+  if (DOM.btnClearGudang) {
+    DOM.btnClearGudang.addEventListener('click', () => {
+      if (DOM.inputNoGudang) {
+        DOM.inputNoGudang.value = '';
+        DOM.inputNoGudang.focus();
+      }
+    });
+  }
 
   // Submit Button Triggers Centered Confirmation Modal Popup
-  DOM.btnSubmit.addEventListener('click', openSubmitConfirmModal);
+  if (DOM.btnSubmit) DOM.btnSubmit.addEventListener('click', openSubmitConfirmModal);
   if (DOM.btnModalClose) DOM.btnModalClose.addEventListener('click', closeSubmitConfirmModal);
-  DOM.btnConfirmCancel.addEventListener('click', closeSubmitConfirmModal);
-  DOM.btnConfirmOk.addEventListener('click', handleConfirmModalOk);
+  if (DOM.btnConfirmCancel) DOM.btnConfirmCancel.addEventListener('click', closeSubmitConfirmModal);
+  if (DOM.btnConfirmOk) DOM.btnConfirmOk.addEventListener('click', handleConfirmModalOk);
 
   // Profile Save & Header PSW Badge Click Toggle
   if (DOM.headerPswStatus) DOM.headerPswStatus.addEventListener('click', handleHeaderPswToggle);
-  DOM.btnSaveProfile.addEventListener('click', handleSaveProfileRealtime);
-  DOM.profilePswToggle.addEventListener('change', handleTogglePasswordRealtime);
+  if (DOM.btnSaveProfile) DOM.btnSaveProfile.addEventListener('click', handleSaveProfileRealtime);
+  if (DOM.profilePswToggle) DOM.profilePswToggle.addEventListener('change', handleTogglePasswordRealtime);
 
   // Password Visibility Toggle in Profile
-  DOM.btnTogglePswVisibility.addEventListener('click', () => {
-    const isPsw = DOM.profilePsw.type === 'password';
-    DOM.profilePsw.type = isPsw ? 'text' : 'password';
-  });
+  if (DOM.btnTogglePswVisibility) {
+    DOM.btnTogglePswVisibility.addEventListener('click', () => {
+      if (DOM.profilePsw) {
+        const isPsw = DOM.profilePsw.type === 'password';
+        DOM.profilePsw.type = isPsw ? 'text' : 'password';
+      }
+    });
+  }
 
   // Clear History
-  DOM.btnClearHistory.addEventListener('click', openClearHistoryConfirmModal);
+  if (DOM.btnClearHistory) DOM.btnClearHistory.addEventListener('click', openClearHistoryConfirmModal);
 
   // Admin User Management Listeners
   if (DOM.btnOpenAddUser) DOM.btnOpenAddUser.addEventListener('click', openAddUserModal);
@@ -1226,10 +1311,10 @@ async function handleConfirmModalOk() {
 // Handle Save Profile (Nama, NIK, Password) -> Realtime Supabase Update
 async function handleSaveProfileRealtime() {
   const oldNik = state.profile.nik;
-  const newNama = DOM.profileNama.value.trim();
-  const newNik = DOM.profileNik.value.trim();
-  const newPsw = DOM.profilePsw.value.trim();
-  const newUsePsw = DOM.profilePswToggle.checked;
+  const newNama = DOM.profileNama ? DOM.profileNama.value.trim() : '';
+  const newNik = DOM.profileNik ? DOM.profileNik.value.trim() : '';
+  const newPsw = DOM.profilePsw ? DOM.profilePsw.value.trim() : '';
+  const newUsePsw = DOM.profilePswToggle ? DOM.profilePswToggle.checked : state.profile.usePsw;
 
   if (!newNama) {
     showToast('Nama Teknisi tidak boleh kosong!', 'error');
@@ -1341,6 +1426,7 @@ async function handleHeaderPswToggle() {
 }
 
 async function handleTogglePasswordRealtime() {
+  if (!DOM.profilePswToggle) return;
   const newUsePsw = DOM.profilePswToggle.checked;
   if (state.profile.usePsw === newUsePsw) return;
 
@@ -1455,9 +1541,15 @@ async function handleLogin() {
     localStorage.setItem(STORAGE_KEYS.SESSION, JSON.stringify({
       isLoggedIn: true,
       nik: authenticatedUser.nik,
+      nama: authenticatedUser.nama,
       isAdmin: state.isAdmin,
       loginAt: new Date().toISOString()
     }));
+
+    // Fresh login after logout goes to Menu Utama (tab-menu)
+    localStorage.setItem(STORAGE_KEYS.LAST_TAB, 'tab-menu');
+    document.documentElement.setAttribute('data-active-tab', 'tab-menu');
+    try { history.replaceState({ tab: 'tab-menu' }, '', '#tab-menu'); } catch (e) {}
 
     state.isLoggedIn = true;
     showAppScreen();
@@ -1477,7 +1569,11 @@ function handleLogout() {
 }
 
 function performLogout() {
+  document.documentElement.classList.remove('is-logged-in');
+  document.documentElement.classList.remove('is-admin');
+  document.documentElement.removeAttribute('data-active-tab');
   localStorage.removeItem(STORAGE_KEYS.SESSION);
+  localStorage.removeItem(STORAGE_KEYS.LAST_TAB);
   showLoginScreen();
   showToast('Anda telah keluar dari akun.', 'info');
 }
@@ -1501,12 +1597,23 @@ function updateModeNavVisibility(targetTabId) {
     state.currentMode = 'pipo';
   } else if (targetTabId === 'tab-finish' || targetTabId === 'tab-finish-all') {
     state.currentMode = 'finish';
+  } else if (targetTabId === 'tab-profile') {
+    if (!state.currentMode || state.currentMode === 'menu') {
+      state.currentMode = 'teknisi';
+    }
+  }
+
+  if (state.currentMode) {
+    try {
+      localStorage.setItem('teknisi_last_active_mode', state.currentMode);
+      document.documentElement.setAttribute('data-current-mode', state.currentMode);
+    } catch(e) {}
   }
 
   // 1. PSW Status Badge (PSW: ON/OFF)
-  // Hide on PIPO, Finish, Teknisi portal, and Menu hub. Show ONLY on Scan mode or Profile.
+  // Hide on Profile, PIPO, Finish, Teknisi portal, and Menu hub. Show ONLY on Scan mode!
   if (DOM.headerPswStatus) {
-    DOM.headerPswStatus.classList.toggle('hidden', state.currentMode !== 'scan' && targetTabId !== 'tab-profile');
+    DOM.headerPswStatus.classList.toggle('hidden', state.currentMode !== 'scan' || targetTabId === 'tab-profile');
   }
 
   // 2. Header LIHAT DATA Button (#header-btn-missing)
@@ -1557,6 +1664,10 @@ function updateModeNavVisibility(targetTabId) {
 }
 
 function switchTab(targetTabId, pushState = true) {
+  if (targetTabId === 'tab-users' && !state.isAdmin) {
+    showToast('Akses ditolak: Halaman User hanya dapat diakses oleh Admin!', 'error');
+    targetTabId = 'tab-menu';
+  }
   if (state.activeTab === targetTabId) return;
 
   if (pushState) {
@@ -1565,6 +1676,10 @@ function switchTab(targetTabId, pushState = true) {
     } catch (e) {}
   }
   state.activeTab = targetTabId;
+  try {
+    localStorage.setItem(STORAGE_KEYS.LAST_TAB, targetTabId);
+    document.documentElement.setAttribute('data-active-tab', targetTabId);
+  } catch (e) {}
 
   updateModeNavVisibility(targetTabId);
 
@@ -2813,9 +2928,14 @@ const VALID_FORM_TECHNICIANS = [
 ];
 
 function prepareFinishForm() {
-  if (DOM.finishTgl && !DOM.finishTgl.value) {
-    const today = new Date().toISOString().split('T')[0];
-    DOM.finishTgl.value = today;
+  if (DOM.finishTgl) {
+    if (!DOM.finishTgl.value) {
+      const today = new Date().toISOString().split('T')[0];
+      DOM.finishTgl.type = 'date';
+      DOM.finishTgl.value = today;
+    } else {
+      DOM.finishTgl.type = 'date';
+    }
   }
 
   // Clear numeric inputs so they are empty by default (no 0)
@@ -3115,7 +3235,7 @@ function renderFinishAllDataTab(parsedRows = null) {
   lucide.createIcons();
 }
 
-async function openMissingModal(isAutoRefresh = false) {
+async function openMissingModal(isAutoRefresh = false, isManualRefresh = false) {
   if (!DOM.modalMissingFinish) return;
 
   // Automatically set active page to Form Input Finish
@@ -3125,15 +3245,17 @@ async function openMissingModal(isAutoRefresh = false) {
 
   DOM.modalMissingFinish.classList.add('active');
 
-  if (!isAutoRefresh) {
+  if (!isAutoRefresh && !isManualRefresh) {
     try {
       history.pushState({ modal: 'missing_finish', tab: state.activeTab }, '', '#lihat-data');
     } catch (e) {}
   }
 
-  if (DOM.syncIconMissing) DOM.syncIconMissing.classList.add('spinning');
+  const iconEl = document.getElementById('sync-icon-missing') || DOM.syncIconMissing;
+  if (iconEl) iconEl.classList.add('spinning');
 
-  if (!isAutoRefresh && DOM.missingFinishSummary) {
+  // Show bottom loading spinner ONLY when opening for the first time (not auto-refresh & not manual refresh button click)
+  if (!isAutoRefresh && !isManualRefresh && DOM.missingFinishSummary) {
     DOM.missingFinishSummary.innerHTML = `
       <div style="text-align:center; padding:14px; color:var(--text-muted);">
         <i data-lucide="loader-2" class="spin-lg"></i>
@@ -3149,7 +3271,8 @@ async function openMissingModal(isAutoRefresh = false) {
   } catch (err) {
     console.warn('Error openMissingModal:', err);
   } finally {
-    if (DOM.syncIconMissing) DOM.syncIconMissing.classList.remove('spinning');
+    const activeIconEl = document.getElementById('sync-icon-missing') || DOM.syncIconMissing;
+    if (activeIconEl) activeIconEl.classList.remove('spinning');
   }
 
   startMissingAutoRefresh();
@@ -3247,6 +3370,7 @@ function closeMissingModal(triggerHistoryBack = true) {
 
 window.selectMissingDate = function(dateStr) {
   if (DOM.finishTgl) {
+    DOM.finishTgl.type = 'date';
     DOM.finishTgl.value = dateStr;
   }
   closeMissingModal();
@@ -3837,10 +3961,11 @@ function renderAllSheetsViews() {
 }
 
 function renderSheetUpdateInfo() {
-  const pendingTs = state.sheetsData.pendingTimestamp || state.sheetsData.lastUpdateTimestamp || 'Memuat data....';
-  const performaTs = state.sheetsData.performaTimestamp || 'Memuat data....';
-  const partKembaliTs = state.sheetsData.partKembaliTimestamp || 'Memuat data....';
-  const tagihanTs = state.sheetsData.tagihanTimestamp || 'Memuat data....';
+  const baseTs = (typeof window !== 'undefined' && window.__INIT_SHEET_TS__) ? window.__INIT_SHEET_TS__ : '';
+  const pendingTs = state.sheetsData.pendingTimestamp || state.sheetsData.lastUpdateTimestamp || baseTs || 'Memuat data....';
+  const performaTs = state.sheetsData.performaTimestamp || pendingTs;
+  const partKembaliTs = state.sheetsData.partKembaliTimestamp || pendingTs;
+  const tagihanTs = state.sheetsData.tagihanTimestamp || pendingTs;
 
   let activeTs = pendingTs;
   if (state.activeTab === 'tab-performa') activeTs = performaTs;
@@ -3929,11 +4054,18 @@ function renderPendingTab() {
             <span>No Seri</span>
             <strong>${item.seri || '-'}</strong>
           </div>
+          <div class="pending-info-item">
+            <span>Status Case</span>
+            <strong>${item.status || 'PENDING'}</strong>
+          </div>
+          <div class="pending-info-item">
+            <span>Usia Case</span>
+            <strong style="color:var(--warning);">${item.usia ? item.usia + ' Hari' : '-'}</strong>
+          </div>
         </div>
         ${item.ket_part ? `<div style="margin-top:4px;font-size:10px;"><span class="pending-part-desc">${item.ket_part}</span></div>` : ''}
         <div class="pending-card-footer">
           <span class="pending-status-badge ${statusClass}">${item.status || 'PENDING'}</span>
-          <span class="pending-age-badge">Usia: ${item.usia ? item.usia + ' Hari' : '-'}</span>
         </div>
       </div>`;
   }).join('');

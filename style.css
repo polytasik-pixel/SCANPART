@@ -40,11 +40,11 @@
 
 /* TEMA TERANG (LIGHT THEME) */
 [data-theme="light"] {
-  --bg-app-bg: #cbd5e1;
-  --bg-main: #f8fafc;
+  --bg-app-bg: #94a3b8;
+  --bg-main: #e2e8f0;
   --bg-card: #ffffff;
   --bg-input: #f1f5f9;
-  --bg-subtle: #e2e8f0;
+  --bg-subtle: #cbd5e1;
   
   --primary: #059669;
   --primary-hover: #047857;
@@ -114,20 +114,21 @@ body {
   flex-direction: column;
   position: relative;
   overflow: hidden;
-  transition: background-color 0.25s ease, max-width 0.25s ease, box-shadow 0.25s ease;
+  transition: background-color 0.25s ease, box-shadow 0.25s ease;
 }
 
-/* Tampilan PC / Desktop / Tablet (Layar Setengah di Tengah, Jarak 2mm Atas-Bawah dari Layar, Sudut 90-Derajat Soft 4px) */
+/* Tampilan PC / Desktop / Tablet (Full Screen Layar Penuh dengan Tata Letak Responsif) */
 @media (min-width: 481px) {
   .app-container {
-    max-width: 480px;
-    height: calc(100vh - 4mm);
-    height: calc(100dvh - 4mm);
+    max-width: 100%;
+    width: 100%;
+    height: 100vh;
+    height: 100dvh;
     max-height: none;
-    border-radius: 4px;
-    border: 1px solid var(--border-dark);
-    box-shadow: 0 0 32px rgba(0, 0, 0, 0.5);
-    margin: 2mm auto;
+    border-radius: 0;
+    border: none;
+    box-shadow: none;
+    margin: 0;
   }
 }
 
@@ -140,6 +141,193 @@ body {
 
 .screen.active {
   display: flex;
+}
+
+html.is-logged-in #screen-login {
+  display: none !important;
+}
+
+html.is-logged-in #screen-app {
+  display: flex !important;
+}
+
+/* Zero-Flicker Instant Tab & Header Visibility Rules */
+html[data-active-tab="tab-finish"] #tab-finish,
+html[data-active-tab="tab-finish-all"] #tab-finish,
+html[data-active-tab="tab-pipo"] #tab-pipo,
+html[data-active-tab="tab-scan"] #tab-scan,
+html[data-active-tab="tab-history"] #tab-history,
+html[data-active-tab="tab-pending"] #tab-pending,
+html[data-active-tab="tab-performa"] #tab-performa,
+html[data-active-tab="tab-notif"] #tab-notif,
+html[data-active-tab="tab-part-kembali"] #tab-part-kembali,
+html[data-active-tab="tab-tagihan"] #tab-tagihan,
+html[data-active-tab="tab-profile"] #tab-profile {
+  display: flex !important;
+  height: 100% !important;
+  min-height: 0 !important;
+}
+
+html[data-active-tab]:not([data-active-tab="tab-menu"]) #tab-menu {
+  display: none !important;
+}
+
+html[data-active-tab="tab-menu"] #tab-menu {
+  display: flex !important;
+}
+
+/* Instant Zero-Reflow Header & Bar Visibility Rules */
+html[data-active-tab="tab-finish"] #header-btn-missing,
+html[data-active-tab="tab-finish-all"] #header-btn-missing {
+  display: inline-flex !important;
+}
+
+html[data-active-tab]:not([data-active-tab="tab-finish"]):not([data-active-tab="tab-finish-all"]) #header-btn-missing {
+  display: none !important;
+}
+
+html[data-active-tab="tab-scan"] #header-psw-status {
+  display: inline-flex !important;
+}
+
+html[data-active-tab]:not([data-active-tab="tab-scan"]) #header-psw-status {
+  display: none !important;
+}
+
+html[data-active-tab="tab-pending"] #sheet-update-bar,
+html[data-active-tab="tab-performa"] #sheet-update-bar,
+html[data-active-tab="tab-notif"] #sheet-update-bar,
+html[data-active-tab="tab-part-kembali"] #sheet-update-bar,
+html[data-active-tab="tab-tagihan"] #sheet-update-bar {
+  display: flex !important;
+}
+
+html[data-active-tab]:not([data-active-tab="tab-pending"]):not([data-active-tab="tab-performa"]):not([data-active-tab="tab-notif"]):not([data-active-tab="tab-part-kembali"]):not([data-active-tab="tab-tagihan"]) #sheet-update-bar {
+  display: none !important;
+}
+
+/* Frame-0 Instant App-Nav Visibility (Zero-Reflow Layout on Sub-Pages) */
+html[data-active-tab]:not([data-active-tab="tab-menu"]) .app-nav {
+  display: flex !important;
+}
+
+html[data-active-tab="tab-menu"] .app-nav {
+  display: none !important;
+}
+
+/* Mode Teknisi Nav Items */
+html[data-active-tab="tab-pending"] .nav-item[data-mode="teknisi"],
+html[data-active-tab="tab-performa"] .nav-item[data-mode="teknisi"],
+html[data-active-tab="tab-notif"] .nav-item[data-mode="teknisi"],
+html[data-active-tab="tab-part-kembali"] .nav-item[data-mode="teknisi"],
+html[data-active-tab="tab-tagihan"] .nav-item[data-mode="teknisi"],
+html[data-active-tab="tab-profile"][data-current-mode="teknisi"] .nav-item[data-mode="teknisi"],
+html[data-active-tab="tab-profile"]:not([data-current-mode]) .nav-item[data-mode="teknisi"] {
+  display: flex !important;
+}
+
+/* Mode Scan Nav Items */
+html[data-active-tab="tab-scan"] .nav-item[data-mode="scan"],
+html[data-active-tab="tab-history"] .nav-item[data-mode="scan"],
+html[data-active-tab="tab-profile"][data-current-mode="scan"] .nav-item[data-mode="scan"] {
+  display: flex !important;
+}
+
+/* Mode Finish Nav Items */
+html[data-active-tab="tab-finish"] .nav-item[data-mode="finish"],
+html[data-active-tab="tab-finish-all"] .nav-item[data-mode="finish"],
+html[data-active-tab="tab-profile"][data-current-mode="finish"] .nav-item[data-mode="finish"] {
+  display: flex !important;
+}
+
+/* Mode PIPO Nav Items */
+html[data-active-tab="tab-pipo"] .nav-item[data-mode="pipo"],
+html[data-active-tab="tab-profile"][data-current-mode="pipo"] .nav-item[data-mode="pipo"] {
+  display: flex !important;
+}
+
+/* All Mode Nav Items (Menu & Profile) */
+html[data-active-tab]:not([data-active-tab="tab-menu"]) .nav-item[data-mode="all"] {
+  display: flex !important;
+}
+
+/* Hide unselected nav items per mode before JS runs */
+html[data-active-tab="tab-pending"] .nav-item:not([data-mode="teknisi"]):not([data-mode="all"]),
+html[data-active-tab="tab-performa"] .nav-item:not([data-mode="teknisi"]):not([data-mode="all"]),
+html[data-active-tab="tab-notif"] .nav-item:not([data-mode="teknisi"]):not([data-mode="all"]),
+html[data-active-tab="tab-part-kembali"] .nav-item:not([data-mode="teknisi"]):not([data-mode="all"]),
+html[data-active-tab="tab-tagihan"] .nav-item:not([data-mode="teknisi"]):not([data-mode="all"]),
+html[data-active-tab="tab-finish"] .nav-item:not([data-mode="finish"]):not([data-mode="all"]),
+html[data-active-tab="tab-finish-all"] .nav-item:not([data-mode="finish"]):not([data-mode="all"]),
+html[data-active-tab="tab-scan"] .nav-item:not([data-mode="scan"]):not([data-mode="all"]),
+html[data-active-tab="tab-history"] .nav-item:not([data-mode="scan"]):not([data-mode="all"]),
+html[data-active-tab="tab-pipo"] .nav-item:not([data-mode="pipo"]):not([data-mode="all"]),
+html[data-active-tab="tab-profile"][data-current-mode="teknisi"] .nav-item:not([data-mode="teknisi"]):not([data-mode="all"]),
+html[data-active-tab="tab-profile"][data-current-mode="scan"] .nav-item:not([data-mode="scan"]):not([data-mode="all"]),
+html[data-active-tab="tab-profile"][data-current-mode="finish"] .nav-item:not([data-mode="finish"]):not([data-mode="all"]),
+html[data-active-tab="tab-profile"][data-current-mode="pipo"] .nav-item:not([data-mode="pipo"]):not([data-mode="all"]),
+html[data-active-tab="tab-profile"]:not([data-current-mode]) .nav-item:not([data-mode="teknisi"]):not([data-mode="all"]) {
+  display: none !important;
+}
+
+/* Strict Admin-Only Guard: Hide User Nav Item & Tab for non-admin */
+html:not(.is-admin) #nav-item-users,
+html:not(.is-admin) .nav-item[data-target="tab-users"],
+html:not(.is-admin) #tab-users,
+html:not(.is-admin) .admin-only {
+  display: none !important;
+}
+
+/* Show User Nav Item ONLY when logged in as Admin */
+html.is-admin[data-active-tab]:not([data-active-tab="tab-menu"]) #nav-item-users {
+  display: flex !important;
+}
+
+html.is-admin[data-active-tab="tab-users"] #tab-users {
+  display: flex !important;
+}
+
+/* Instant Zero-Flicker Active Tab Highlight Driven by HTML data-active-tab */
+html[data-active-tab="tab-menu"] .nav-item[data-target="tab-menu"],
+html[data-active-tab="tab-scan"] .nav-item[data-target="tab-scan"],
+html[data-active-tab="tab-history"] .nav-item[data-target="tab-history"],
+html[data-active-tab="tab-pending"] .nav-item[data-target="tab-pending"],
+html[data-active-tab="tab-performa"] .nav-item[data-target="tab-performa"],
+html[data-active-tab="tab-notif"] .nav-item[data-target="tab-notif"],
+html[data-active-tab="tab-part-kembali"] .nav-item[data-target="tab-part-kembali"],
+html[data-active-tab="tab-tagihan"] .nav-item[data-target="tab-tagihan"],
+html[data-active-tab="tab-finish"] .nav-item[data-target="tab-finish"],
+html[data-active-tab="tab-finish-all"] .nav-item[data-target="tab-finish-all"],
+html[data-active-tab="tab-pipo"] .nav-item[data-target="tab-pipo"],
+html[data-active-tab="tab-profile"] .nav-item[data-target="tab-profile"] {
+  color: var(--primary) !important;
+}
+
+html[data-active-tab="tab-menu"] .nav-item[data-target="tab-menu"] i,
+html[data-active-tab="tab-menu"] .nav-item[data-target="tab-menu"] svg,
+html[data-active-tab="tab-scan"] .nav-item[data-target="tab-scan"] i,
+html[data-active-tab="tab-scan"] .nav-item[data-target="tab-scan"] svg,
+html[data-active-tab="tab-history"] .nav-item[data-target="tab-history"] i,
+html[data-active-tab="tab-history"] .nav-item[data-target="tab-history"] svg,
+html[data-active-tab="tab-pending"] .nav-item[data-target="tab-pending"] i,
+html[data-active-tab="tab-pending"] .nav-item[data-target="tab-pending"] svg,
+html[data-active-tab="tab-performa"] .nav-item[data-target="tab-performa"] i,
+html[data-active-tab="tab-performa"] .nav-item[data-target="tab-performa"] svg,
+html[data-active-tab="tab-notif"] .nav-item[data-target="tab-notif"] i,
+html[data-active-tab="tab-notif"] .nav-item[data-target="tab-notif"] svg,
+html[data-active-tab="tab-part-kembali"] .nav-item[data-target="tab-part-kembali"] i,
+html[data-active-tab="tab-part-kembali"] .nav-item[data-target="tab-part-kembali"] svg,
+html[data-active-tab="tab-tagihan"] .nav-item[data-target="tab-tagihan"] i,
+html[data-active-tab="tab-tagihan"] .nav-item[data-target="tab-tagihan"] svg,
+html[data-active-tab="tab-finish"] .nav-item[data-target="tab-finish"] i,
+html[data-active-tab="tab-finish"] .nav-item[data-target="tab-finish"] svg,
+html[data-active-tab="tab-finish-all"] .nav-item[data-target="tab-finish-all"] i,
+html[data-active-tab="tab-finish-all"] .nav-item[data-target="tab-finish-all"] svg,
+html[data-active-tab="tab-pipo"] .nav-item[data-target="tab-pipo"] i,
+html[data-active-tab="tab-pipo"] .nav-item[data-target="tab-pipo"] svg,
+html[data-active-tab="tab-profile"] .nav-item[data-target="tab-profile"] i,
+html[data-active-tab="tab-profile"] .nav-item[data-target="tab-profile"] svg {
+  color: var(--primary) !important;
 }
 
 /* ==========================================
@@ -266,17 +454,21 @@ body {
 }
 
 .nik-badge {
-  font-size: 10px;
-  color: rgba(255, 255, 255, 0.9);
+  font-size: 11.5px;
+  color: rgba(255, 255, 255, 0.95);
   display: inline-flex;
   align-items: center;
   gap: 3px;
-  font-weight: 600;
+  font-weight: 700;
+  line-height: 1.2;
 }
 
-.nik-badge i {
-  width: 11px;
-  height: 11px;
+.nik-badge i, .nik-badge svg, #header-nik i, #header-nik svg {
+  width: 13px !important;
+  height: 13px !important;
+  min-width: 13px !important;
+  min-height: 13px !important;
+  flex-shrink: 0 !important;
 }
 
 .header-psw-badge {
@@ -520,6 +712,23 @@ body {
 /* ==========================================
    DEDICATED PROFILE SCREEN (SCROLLABLE ON PC & MOBILE)
    ========================================== */
+.profile-grid-container {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+}
+
+.profile-sidebar, .profile-main {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+}
+
+.desktop-only { display: none !important; }
+.mobile-only { display: block !important; }
+
 #tab-profile.tab-content {
   width: 100%;
   box-sizing: border-box;
@@ -572,6 +781,13 @@ body {
   display: flex;
   flex-direction: column;
   gap: 8px;
+}
+
+#tab-profile input[readonly], #tab-profile input:disabled {
+  background-color: var(--bg-input) !important;
+  opacity: 0.85;
+  cursor: not-allowed;
+  border-color: var(--border-color) !important;
 }
 
 #tab-profile .form-group {
@@ -1275,9 +1491,23 @@ input:checked + .slider:before { transform: translateX(20px); }
   animation: spinSmooth 1.2s infinite linear;
 }
 
+@-webkit-keyframes spinSmooth {
+  0% { -webkit-transform: rotate(0deg); transform: rotate(0deg); }
+  100% { -webkit-transform: rotate(360deg); transform: rotate(360deg); }
+}
+
 @keyframes spinSmooth {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+  0% { -webkit-transform: rotate(0deg); transform: rotate(0deg); }
+  100% { -webkit-transform: rotate(360deg); transform: rotate(360deg); }
+}
+
+.spinning, svg.spinning, i.spinning, .spin, .spin-icon.spinning {
+  -webkit-animation: spinSmooth 0.8s linear infinite !important;
+  animation: spinSmooth 0.8s linear infinite !important;
+  display: inline-block !important;
+  -webkit-transform-origin: center !important;
+  transform-origin: center !important;
+  transform-box: fill-box !important;
 }
 
 .queue-msg {
@@ -1338,19 +1568,35 @@ input:checked + .slider:before { transform: translateX(20px); }
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
   gap: 2px;
   font-size: 10px;
   font-weight: 600;
   cursor: pointer;
-  width: 33%;
+  flex: 1 1 0px !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  padding: 4px 0 !important;
+  box-sizing: border-box !important;
+  position: relative;
 }
 
-.nav-item i {
-  width: 17px;
-  height: 17px;
+.nav-item i, .nav-item svg {
+  width: 17px !important;
+  height: 17px !important;
+  min-width: 17px !important;
+  min-height: 17px !important;
+  max-width: 17px !important;
+  max-height: 17px !important;
+  flex-shrink: 0 !important;
+  display: block !important;
 }
 
 .nav-item.active {
+  color: var(--primary);
+}
+
+.nav-item.active i, .nav-item.active svg {
   color: var(--primary);
 }
 
@@ -1567,6 +1813,33 @@ input:checked + .slider:before { transform: translateX(20px); }
   box-shadow: 0 0 4px rgba(239, 68, 68, 0.8);
   border: 1px solid #ffffff;
   animation: pulse-ring 2s infinite;
+}
+
+.nav-badge {
+  position: absolute;
+  top: 1px;
+  left: calc(50% + 3px);
+  background-color: var(--danger);
+  color: white;
+  font-size: 8.5px;
+  font-weight: 800;
+  width: 16px !important;
+  height: 16px !important;
+  min-width: 16px !important;
+  min-height: 16px !important;
+  max-width: 16px !important;
+  max-height: 16px !important;
+  padding: 0 !important;
+  border-radius: 50% !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  box-shadow: 0 0 4px rgba(239, 68, 68, 0.8);
+  border: 1px solid #ffffff;
+  z-index: 2;
+  box-sizing: border-box !important;
+  aspect-ratio: 1 / 1 !important;
+  line-height: 1 !important;
 }
 
 .bell-badge.hidden, .nav-badge.hidden {
@@ -2094,11 +2367,14 @@ input:checked + .slider:before { transform: translateX(20px); }
   padding: 16px 14px;
   display: flex;
   gap: 14px;
-  align-items: flex-start;
+  align-items: stretch;
   cursor: pointer;
   transition: all 0.25s ease;
   position: relative;
   user-select: none;
+  height: 138px;
+  min-height: 138px;
+  box-sizing: border-box;
 }
 
 .mode-card:hover {
@@ -2145,6 +2421,7 @@ input:checked + .slider:before { transform: translateX(20px); }
 .mode-card-content {
   display: flex;
   flex-direction: column;
+  justify-content: space-between;
   gap: 5px;
   flex: 1;
 }
@@ -2159,6 +2436,11 @@ input:checked + .slider:before { transform: translateX(20px); }
   font-size: 10.5px;
   color: var(--text-muted);
   line-height: 1.4;
+  min-height: 30px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .mode-card-btn {
@@ -2808,6 +3090,286 @@ input:checked + .slider:before { transform: translateX(20px); }
   line-height: 1;
   width: 100%;
   margin: 0;
+}
+
+/* ==========================================
+   OPTIMASI TAMPILAN PC & DESKTOP (FULL SCREEN RESPONSIVE LAYOUT)
+   ========================================== */
+@media (min-width: 768px) {
+  [data-theme="light"] {
+    --bg-app-bg: #64748b;
+    --bg-main: #e2e8f0;
+    --bg-subtle: #cbd5e1;
+  }
+
+  /* Header & Navigation Padding & Sizes (4cm padding kanan-kiri khusus PC) */
+  .app-header {
+    padding-top: 10px;
+    padding-bottom: 10px;
+    padding-left: 4cm !important;
+    padding-right: 4cm !important;
+  }
+
+  .header-text h1 {
+    font-size: 13.5px;
+  }
+
+  .nik-badge {
+    font-size: 13.5px;
+  }
+
+  .header-psw-badge {
+    font-size: 12.5px;
+    padding: 5px 12px;
+  }
+
+  .sheet-update-bar {
+    padding-top: 8px;
+    padding-bottom: 8px;
+    padding-left: 4cm !important;
+    padding-right: 4cm !important;
+    font-size: 12.5px;
+  }
+
+  .app-body {
+    padding-top: 14px;
+    padding-bottom: 14px;
+    padding-left: 4cm !important;
+    padding-right: 4cm !important;
+    gap: 14px;
+    max-width: 100% !important;
+    margin: 0 auto;
+    width: 100%;
+  }
+
+  .app-nav {
+    height: 58px;
+    padding-left: 4cm !important;
+    padding-right: 4cm !important;
+    max-width: 100% !important;
+    margin: 0 auto;
+    width: 100%;
+  }
+
+  .nav-item {
+    font-size: 11.5px;
+  }
+
+  .nav-item i, .nav-item svg {
+    width: 20px;
+    height: 20px;
+  }
+
+  .nav-badge {
+    top: 0px;
+    left: calc(50% + 4px);
+    width: 18px !important;
+    height: 18px !important;
+    min-width: 18px !important;
+    min-height: 18px !important;
+    max-width: 18px !important;
+    max-height: 18px !important;
+    font-size: 9.5px !important;
+    border-radius: 50% !important;
+    padding: 0 !important;
+  }
+
+  /* 1. Main Menu Hub Grid */
+  .menu-hub-wrapper {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 16px;
+    align-items: stretch;
+    padding: 10px 0;
+  }
+
+  .mode-card {
+    height: 138px !important;
+    min-height: 138px !important;
+  }
+
+  .menu-hub-welcome {
+    grid-column: 1 / -1;
+    flex-direction: row;
+    text-align: left;
+    align-items: center;
+    padding: 16px 20px;
+    gap: 16px;
+  }
+
+  .menu-hub-welcome i, .menu-hub-welcome svg {
+    width: 32px;
+    height: 32px;
+  }
+
+  .menu-hub-welcome h2 {
+    font-size: 16px;
+  }
+
+  /* 2. Transfer Stok / Scanner Side-by-Side (Clean & Equal Height Grid) */
+  #tab-scan.tab-content.active,
+  html[data-active-tab="tab-scan"] #tab-scan {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 16px !important;
+    align-items: stretch !important;
+    height: 100% !important;
+    min-height: 0 !important;
+  }
+
+  #tab-scan .scanner-card,
+  #tab-scan .draft-card {
+    height: 100% !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: space-between !important;
+    min-height: 0 !important;
+    box-sizing: border-box !important;
+  }
+
+  #tab-scan .draft-container {
+    flex: 1 !important;
+    min-height: 200px !important;
+    overflow-y: auto !important;
+  }
+
+  /* 3. Pending Cases Grid - 2 Kolom Kanan Kiri khusus PC */
+  .pending-container,
+  .pending-list-container {
+    display: grid !important;
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 12px !important;
+  }
+
+  .pending-card {
+    margin-bottom: 0;
+  }
+
+  /* 4. Form Input Finish Harian - Grid 2 Kolom Kanan Kiri khusus PC */
+  .form-grid-2 {
+    display: grid !important;
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 12px !important;
+  }
+
+  /* 5. Performa / Insentif Side-by-Side & Auto-Size Stat Grid */
+  #tab-performa.tab-content.active {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    align-items: start;
+  }
+
+  .performa-stat-grid {
+    display: grid !important;
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)) !important;
+    gap: 10px !important;
+    width: 100% !important;
+  }
+
+  .performa-stat-box {
+    min-height: 58px !important;
+    padding: 10px 8px !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  /* 6. Notifikasi Grid */
+  .notif-container {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+  }
+
+  /* 7. Part Belum Kembali & Tagihan Grids */
+  .part-kembali-list-container,
+  .tagihan-list-container {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+  }
+
+  /* 8. Part Pengganti (PIPO) Grid */
+  .pipo-list-container {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+  }
+
+  #tab-pipo.tab-content.active {
+    height: calc(100vh - 125px);
+    height: calc(100dvh - 125px);
+  }
+
+  /* 9. Finish All Data Grid */
+  .finish-all-list-container {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+  }
+
+  .desktop-only { display: block !important; }
+  .mobile-only { display: none !important; }
+
+  /* 10. Dedicated Profile Grid */
+  #tab-profile.tab-content.active {
+    display: block;
+  }
+
+  .profile-grid-container {
+    display: grid !important;
+    grid-template-columns: 340px 1fr !important;
+    gap: 18px !important;
+    align-items: stretch !important;
+    max-width: 980px !important;
+    margin: 0 auto !important;
+    width: 100% !important;
+  }
+
+  .profile-sidebar {
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: space-between !important;
+    height: 100% !important;
+    gap: 12px !important;
+  }
+
+  .profile-main {
+    display: flex !important;
+    flex-direction: column !important;
+    height: 100% !important;
+  }
+
+  .card-profile-form {
+    height: 100% !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: flex-start !important;
+    box-sizing: border-box !important;
+  }
+
+  #form-profile {
+    display: flex !important;
+    flex-direction: column !important;
+    flex: 1 !important;
+    gap: 12px !important;
+  }
+
+  .btn-logout-danger, .btn-logout-danger i, .btn-logout-danger svg {
+    background-color: #ef4444 !important;
+    color: #ffffff !important;
+    stroke: #ffffff !important;
+    font-weight: 700 !important;
+  }
+
+  .btn-logout-danger:hover {
+    background-color: #dc2626 !important;
+  }
+
+  /* 11. Modals */
+  .modal-card {
+    max-width: 520px;
+  }
 }
 
 
